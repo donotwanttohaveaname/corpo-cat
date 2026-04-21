@@ -518,12 +518,19 @@ function ensureAudio() {
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-// Resume audio context on every user interaction (fixes Day 2+ silence)
+// Resume audio context on every user interaction + on visibility return.
+// Some browsers suspend the context after backgrounding the tab.
 document.addEventListener('click', () => { ensureAudio(); }, true);
 document.addEventListener('keydown', () => { ensureAudio(); }, true);
+document.addEventListener('pointerdown', () => { ensureAudio(); }, true);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') ensureAudio();
+});
 
 function sfx(type) {
   const c = ensureAudio(); if (!c) return;
+  // Double-guard: if still suspended for any reason, try to resume then proceed
+  if (c.state === 'suspended' && c.resume) { try { c.resume(); } catch (e) {} }
   const now = c.currentTime;
   if (type === 'spank') {
     const buf = c.createBuffer(1, c.sampleRate * 0.15, c.sampleRate);
@@ -2197,9 +2204,27 @@ function drawHomeOffice() {
   px(604, 486, 62, 8, C.rug);
   sprite(606, 446, 3, SPR.cat_sit, CM.cat);
 
-  // Home vomit splat (if Kinu recently vomited)
+  // Kinu retching animation — draw her mid-vomit at the event location
+  if (G.kinuVomiting) {
+    // Slight shake of her body
+    const shake = Math.floor((performance.now() / 60) % 2);
+    sprite(G.kinuVomiting.x + shake, G.kinuVomiting.y, 3, SPR.cat_vomit, CM.cat);
+    // Tiny upset lines above her
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('!', G.kinuVomiting.x + 16, G.kinuVomiting.y - 6);
+    ctx.fillText('!', G.kinuVomiting.x + 30, G.kinuVomiting.y - 10);
+  }
+  // Home vomit splat (stays until cleaned)
   if (G.homeVomit) {
     drawVomit(G.homeVomit.x, G.homeVomit.y);
+    // Pulse a pink outline around it so it's unmissable
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+    ctx.strokeStyle = 'rgba(255, 60, 120, ' + (0.4 + 0.5 * pulse).toFixed(2) + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(G.homeVomit.x, G.homeVomit.y, 30 + pulse * 6, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   drawVignette();
@@ -3524,20 +3549,20 @@ function fireKinuEvent(forceVomit) {
   if (e.sound) sfx(e.sound); else sfx('meow');
   showBubble(e.bubble, 1800);
   setDialogue('KINU', e.line);
-  // If it's a vomit event, plant a visible splat somewhere in the home scene
+  // If it's a vomit event, show Kinu retching + plant splat in the home scene
   if (e.id && e.id.startsWith('vomit_')) {
     G.homeVomitCount = (G.homeVomitCount || 0) + 1;
-    // Place vomit in a visible, clickable zone that isn't covered by
-    // the stats bar (y<80) the buttons (bottom ~140) or the dialogue.
-    // Safe y range: 200-340 (middle of the scene)
-    G.homeVomit = {
-      x: 100 + Math.random() * 580,
-      y: 220 + Math.random() * 110,
-      life: 999, // stays until clicked to clean
-    };
-    // Escalating upsetting dialogue — prefix with UGH
+    // Placement: visible, clickable, not covered by UI (stats y<80, buttons bottom ~140)
+    const vx = 100 + Math.random() * 580;
+    const vy = 220 + Math.random() * 110;
+    G.homeVomit = { x: vx, y: vy, life: 999 }; // stays until player clicks
+    // Kinu visibly retching next to the splat for ~2.5s
+    G.kinuVomiting = { x: vx - 36, y: vy - 26, timer: 2.5 };
+    // Retch sounds — loud + one follow-up heave
+    sfx('retch');
+    setTimeout(() => sfx('retch'), 950);
     const upsetPrefix = '<span style="color:#ff3d7f;font-weight:bold;">KINU VOMITED.</span> ';
-    setDialogue('KINU', upsetPrefix + e.line + '<br><i>(click the vomit to clean it. focus is draining.)</i>');
+    setDialogue('KINU', upsetPrefix + e.line + '<br><i>(click the puddle to clean it. focus is draining.)</i>');
     showSpiralOverlay('KINU.', 'clean it. now.', 1800);
     // Shake for drama
     const g = document.getElementById('game');
@@ -3582,6 +3607,11 @@ function loop(ts) {
       G.focus = Math.max(0, G.focus - dt * 6);
       G.fun = Math.max(0, G.fun - dt * 2);
       G.boss = Math.min(100, G.boss + dt * 1.5);
+    }
+    // Tick the Kinu retch animation
+    if (G.kinuVomiting) {
+      G.kinuVomiting.timer -= dt;
+      if (G.kinuVomiting.timer <= 0) G.kinuVomiting = null;
     }
 
     // --- Kinu does something annoying (home only) ---

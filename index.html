@@ -385,6 +385,78 @@
   .distraction.spicy {
     animation: wobble 0.25s infinite alternate, flash 0.6s infinite;
   }
+  /* ===== HIM recap overlay — dedicated layout, no button collision ===== */
+  #him-recap-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: rgba(10, 6, 18, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier New', monospace;
+    padding: 20px;
+    box-sizing: border-box;
+    animation: recapFade 0.5s ease-out;
+  }
+  @keyframes recapFade { from { opacity: 0; } to { opacity: 1; } }
+  .recap-card {
+    width: 100%;
+    max-width: 640px;
+    max-height: 92%;
+    overflow-y: auto;
+    background: rgba(20, 10, 28, 0.95);
+    border: 3px solid #ff6b9d;
+    padding: 24px 28px;
+    color: #f5d5e0;
+    line-height: 1.55;
+    box-shadow: 0 0 60px rgba(255, 107, 157, 0.35);
+  }
+  .recap-kicker {
+    color: #ff3d7f;
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .recap-title {
+    color: #ffd166;
+    font-weight: bold;
+    font-size: 22px;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+  }
+  .recap-body {
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+  .recap-divider {
+    color: #6ad4c4;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 18px 0 14px;
+    border-top: 1px dashed rgba(106, 212, 196, 0.4);
+    padding-top: 14px;
+  }
+  .recap-btn {
+    display: block;
+    margin: 22px auto 0;
+    background: #6ad4c4;
+    border: 3px solid #fff;
+    color: #1a0a20;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 10px 30px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    box-shadow: 4px 4px 0 #1a0a20;
+    font-size: 14px;
+  }
+  .recap-btn:hover { background: #92e2d4; }
+  .recap-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #1a0a20; }
+
   #version-footer {
     position: fixed;
     bottom: 10px;
@@ -523,7 +595,7 @@
     <button class="btn" style="margin-top:24px" onclick="startGame()">START DAY 1</button>
   </div>
 </div>
-<div id="version-footer">v2.0 — corpo cat</div>
+<div id="version-footer">v2.1 — corpo cat</div>
 
 <script>
 // ============================================================
@@ -3634,9 +3706,9 @@ const DISTRACTIONS = [
     'Asks it "am I cooked". It says "you\'re doing great! 🌟". He feels worse.',
     'Asks it to write a breakup text. It obliges. He doesn\'t have anyone to break up with.',
   ]},
-  { id: 'ticketshop', label: 'RYANAIR\n✈️ flash sale', color: '#193073', fun: 18, focus: -14, boss: 4, ctx: 'both', lines: [
-    '€19 to Valencia in November. He adds seat selection. €37. Priority boarding. €52. Backs out.',
-    '€11 to Stansted. He does not want to go to Stansted. He books anyway.',
+  { id: 'ticketshop', label: 'FINNAIR\n✈️ flash sale', color: '#0073cf', fun: 18, focus: -14, boss: 4, ctx: 'both', lines: [
+    '€89 to Valencia via Helsinki in November. He adds seat selection. €127. Priority boarding. €152. Backs out.',
+    '€71 to Málaga, mid-November, direct. He does not have November plans. He books anyway.',
   ]},
   { id: 'google_maps', label: 'MAPS\n📍 "walkable?"', color: '#4a90e2', fun: 10, focus: -10, boss: 3, ctx: 'both', lines: [
     '"Is it walkable to the beach from this Airbnb" — 43 min walk. "It\'s charming."',
@@ -4522,7 +4594,7 @@ function winGame() {
   clearActions();
   sfx('win');
   setDialogue('ZHENG',
-    'MALAGA BABY. $' + Math.round(G.money) + ' in the account. Booked the flight on Ryanair.<br>' +
+    'MALAGA BABY. $' + Math.round(G.money) + ' in the account. Booked the flight on Finnair.<br>' +
     'Anna is already there. Susan is fighting with a DJ. Joy bought 4 caftans. Kinu is with the cat sitter (sending hourly threat-receipts).<br>' +
     'Sandal Slacked "have fun! 🙂" — I didn\'t reply.');
   addButton('PLAY AGAIN', 'alt', () => location.reload());
@@ -4550,6 +4622,8 @@ function showHimRecap() {
   clearDistractions();
   statsBar.classList.add('hidden');
   canvas.onclick = null;
+  // Hide the normal dialogue + action areas — recap uses its own overlay
+  document.getElementById('dialogue').style.display = 'none';
 
   const goingToSpain = G.money >= G.goal;
   const isTogether = (G.himPath === TOGETHER_PATH.daytime) &&
@@ -4576,20 +4650,17 @@ function showHimRecap() {
     title = dEnd.title;
     body = dEnd.text;
   } else {
-    // Defensive fallback — player never completed the HIM arc
     title = 'THE WEEK, WITH HIM';
     body = 'he texted sometimes. you replied sometimes. nothing was decided. the week just ended.';
   }
 
-  // Spain-variant coda — the actual ending of the situationship is
-  // flavored by whether Zheng is getting on the plane or not.
   let spainCoda;
   if (isTogether) {
     spainCoda = goingToSpain
       ? 'you fly to malaga sunday morning. he texts "have fun 🫶" — you reply "i will 🌹" from 33,000 ft. he\'ll be there when you get back.'
       : 'the girls fly to malaga without you. but this weekend he is here, and he is yours, and he brings you coffee in bed. it is somehow enough.';
   } else if (goingToSpain) {
-    spainCoda = 'sunday morning: you board the flight to malaga with anna, lena, susan. ' +
+    spainCoda = 'sunday morning: you board the flight to malaga with anna, susan, joy. ' +
       'he texts "have fun 🫶" at 8:04am. you see it from 33,000 feet, second glass of cava, ' +
       'and you do not reply. you post a photo of the coast. he watches. you don\'t look.';
   } else {
@@ -4598,17 +4669,28 @@ function showHimRecap() {
       'nothing came up. you just could not. kinu vomits at 10:12am. the cycle resumes.';
   }
 
-  setDialogue(
-    '<span style="color:#ff3d7f;">HIM — the week in review.</span>',
-    '<b style="color:#ffd166;">' + title + '</b><br>' +
-    '<i>' + body + '</i><br><br>' +
-    '<span style="color:#6ad4c4;">and on sunday:</span><br>' +
-    '<i>' + spainCoda + '</i>'
-  );
-  addButton('CONTINUE →', 'alt', () => {
+  // Build a dedicated overlay (replaces any existing one)
+  const existing = document.getElementById('him-recap-overlay');
+  if (existing) existing.remove();
+  const game = document.getElementById('game');
+  const ov = document.createElement('div');
+  ov.id = 'him-recap-overlay';
+  ov.innerHTML =
+    '<div class="recap-card">' +
+      '<div class="recap-kicker">HIM — the week in review</div>' +
+      '<div class="recap-title">' + title + '</div>' +
+      '<div class="recap-body"><i>' + body + '</i></div>' +
+      '<div class="recap-divider">— and on sunday —</div>' +
+      '<div class="recap-body"><i>' + spainCoda + '</i></div>' +
+      '<button class="recap-btn">CONTINUE →</button>' +
+    '</div>';
+  game.appendChild(ov);
+  ov.querySelector('.recap-btn').onclick = () => {
+    ov.remove();
+    document.getElementById('dialogue').style.display = '';
     if (goingToSpain) winGame();
     else loseGame();
-  });
+  };
   sfx('slack');
 }
 

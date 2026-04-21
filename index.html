@@ -523,7 +523,7 @@
     <button class="btn" style="margin-top:24px" onclick="startGame()">START DAY 1</button>
   </div>
 </div>
-<div id="version-footer">v1.8 — corpo cat</div>
+<div id="version-footer">v1.9 — corpo cat</div>
 
 <script>
 // ============================================================
@@ -2392,7 +2392,7 @@ function drawBedroom() {
   sprite(bdx - 18, bdy + 20, 3, SPR.zheng_sleep, CM.zheng_sleep);
 
   // Vomit if present
-  if (G.vomitSpot && !G.vomitCleaned) {
+  if (G.vomitSpot && G.vomitDeposited && !G.vomitCleaned) {
     drawVomit(G.vomitSpot.x, G.vomitSpot.y);
   }
 
@@ -2836,6 +2836,7 @@ function startMorning() {
   ensureAudio();
   G.vomitSpot = randomVomitSpot();
   G.vomitCleaned = false;
+  G.vomitDeposited = false; // splat only renders AFTER the cat has hork'd
   G.cat = { x: 200, y: 440, walking: true, vomiting: false };
   statsBar.classList.add('hidden');
   clearActions();
@@ -2861,6 +2862,8 @@ function startMorning() {
       G.cat.vomiting = true;
       sfx('meow');
       setTimeout(() => sfx('retch'), 240);
+      // Splat appears in sync with the retch audio, not before.
+      setTimeout(() => { G.vomitDeposited = true; }, 380);
       setDialogue('KINU', 'meow— HRRRRRRRK... *splat*');
       setTimeout(() => {
         G.cat.vomiting = false;

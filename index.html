@@ -519,21 +519,46 @@ ctx.imageSmoothingEnabled = false;
 
 // -------- Web Audio SFX (synthesized, no files) --------
 let audioCtx = null;
+let audioUnlocked = false;
 function ensureAudio() {
   if (!audioCtx) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-    catch(e) { audioCtx = null; }
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) { audioCtx = null; return null; }
   }
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  // Silent-buffer primer — the standard Web Audio unlock. Fully "wakes"
+  // the context so scheduled sounds aren't silently dropped. Run once.
+  if (!audioUnlocked) {
+    try {
+      const buf = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+      audioUnlocked = true;
+    } catch(e) {}
+  }
   return audioCtx;
 }
-// Resume audio context on every user interaction + on visibility return.
-// Some browsers suspend the context after backgrounding the tab.
+// Create/resume ONLY from real user gestures. Creating the context from a
+// non-gesture event (e.g. visibilitychange on reload) leaves it permanently
+// blocked in Chrome — that's the "every second launch has no sound" bug.
 document.addEventListener('click', () => { ensureAudio(); }, true);
 document.addEventListener('keydown', () => { ensureAudio(); }, true);
 document.addEventListener('pointerdown', () => { ensureAudio(); }, true);
+// visibilitychange is NOT a user gesture — only RESUME an existing context,
+// never create a new one from here.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') ensureAudio();
+  if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+});
+// bfcache restore — browsers may restore page with a suspended context
+window.addEventListener('pageshow', () => {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
 });
 
 function sfx(type) {
@@ -4626,6 +4651,10 @@ requestAnimationFrame(idleRender);
 // START
 // ==================================================
 function startGame() {
+  // Guarantee audio is created + unlocked inside this user gesture.
+  // Fixes "no sound on reload" — the click on START DAY 1 is a confirmed
+  // gesture, so Chrome's autoplay policy allows context creation + resume.
+  ensureAudio();
   document.getElementById('title-screen').classList.add('hidden');
   G.day = 1;
   G.money = 0;

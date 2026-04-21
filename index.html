@@ -1127,6 +1127,11 @@ const HIM_EVENING_TREE = {
   ]},
 };
 
+// The ONE secret path out of 1024 where they end up together.
+// Daytime path "10110" + evening path "10110" = the "TOGETHER" ending.
+// Every other combination is breakup or miserable.
+const TOGETHER_PATH = { daytime: '10110', evening: '10110' };
+
 // 32 evening ending fragments — combined with 32 daytime endings = 1024 outcomes
 const HIM_EVENING_ENDINGS = {
   '0000-0': 'a 2am shirtless-mirror picture. forwarded to anna. you\'ll laugh in malaga.',
@@ -1208,7 +1213,22 @@ function showEveningNode(pathKey) {
           G.himEveningEnding = opt.end;
           const dEnd = HIM_ENDINGS[G.himEnding];
           const eFrag = HIM_EVENING_ENDINGS[opt.end];
+          // Check for the ONE secret TOGETHER ending out of 1024
+          const isTogether = (G.himPath === TOGETHER_PATH.daytime) &&
+                             (G.himEveningPath === TOGETHER_PATH.evening);
           setTimeout(() => {
+            if (isTogether) {
+              sfx('win'); setTimeout(() => sfx('win'), 600);
+              setDialogue(
+                '<span style="color:#ffd166;">🌹 TOGETHER.</span>',
+                '<i>six months later he\'s cooking eggs in your kitchen. kinu tolerates him, just barely. ' +
+                'you still don\'t know if this lasts — but you\'re here, and it\'s warm, and he shows up when he says he will. ' +
+                'anna says "i still don\'t trust him" every brunch. you say "i know." you smile anyway.</i>' +
+                '<br><br><span style="color:#6ad4c4;font-weight:bold;">YOU FOUND THE 1-IN-1024 ENDING.</span>' +
+                '<br><span style="color:#999;">(path: ' + G.himPath + '/' + G.himEveningPath + ')</span>'
+              );
+              return;
+            }
             setDialogue(
               '<span style="color:#6ad4c4;">ENDING:</span> ' + (dEnd ? dEnd.title : 'THE WEEK'),
               '<i>' + (dEnd ? dEnd.text : 'the week.') + '</i><br><br>' +

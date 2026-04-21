@@ -529,8 +529,15 @@ document.addEventListener('visibilitychange', () => {
 
 function sfx(type) {
   const c = ensureAudio(); if (!c) return;
-  // Double-guard: if still suspended for any reason, try to resume then proceed
-  if (c.state === 'suspended' && c.resume) { try { c.resume(); } catch (e) {} }
+  // If suspended, wait for resume() to finish before scheduling — otherwise
+  // currentTime is frozen and nodes get scheduled in the past and are silent.
+  if (c.state === 'suspended' && c.resume) {
+    c.resume().then(() => _playSfx(c, type)).catch(() => {});
+    return;
+  }
+  _playSfx(c, type);
+}
+function _playSfx(c, type) {
   const now = c.currentTime;
   if (type === 'spank') {
     const buf = c.createBuffer(1, c.sampleRate * 0.15, c.sampleRate);

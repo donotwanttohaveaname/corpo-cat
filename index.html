@@ -2808,8 +2808,9 @@ function startMorning() {
       G.cat.x = tx; G.cat.y = ty;
       G.cat.walking = false;
       G.cat.vomiting = true;
-      sfx('retch');
-      setDialogue('KINU', 'HRRRRRRRK... *splat*');
+      sfx('meow');
+      setTimeout(() => sfx('retch'), 240);
+      setDialogue('KINU', 'meow— HRRRRRRRK... *splat*');
       setTimeout(() => {
         G.cat.vomiting = false;
         // Cat wanders away
@@ -3853,9 +3854,10 @@ function fireKinuEvent(forceVomit) {
     G.homeVomit = { x: vx, y: vy, life: 999 }; // stays until player clicks
     // Kinu visibly retching next to the splat for ~2.5s
     G.kinuVomiting = { x: vx - 36, y: vy - 26, timer: 2.5 };
-    // Retch sounds — loud + one follow-up heave
-    sfx('retch');
-    setTimeout(() => sfx('retch'), 950);
+    // A pitiful meow first, THEN the retch — loud + one follow-up heave
+    sfx('meow');
+    setTimeout(() => sfx('retch'), 280);
+    setTimeout(() => sfx('retch'), 1180);
     const upsetPrefix = '<span style="color:#ff3d7f;font-weight:bold;">KINU VOMITED.</span> ';
     setDialogue('KINU', upsetPrefix + e.line + '<br><i>(click the puddle to clean it. focus is draining.)</i>');
     showSpiralOverlay('KINU.', 'clean it. now.', 1800);

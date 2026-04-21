@@ -1177,60 +1177,7 @@ function fireHimIfDue() {
   showHimNode(path);
 }
 
-let G_him = null;
-function showHimMessage(msg, onDismiss) {
-  const ov = document.getElementById('him-overlay');
-  const thread = ov.querySelector('.him-thread');
-  thread.innerHTML = '';
-  const b = document.createElement('div');
-  b.className = 'him-msg' + (msg.fromMe ? ' me' : '');
-  b.textContent = msg.text;
-  thread.appendChild(b);
-  ov.querySelector('.him-time').textContent = msg.time + ' · ' + DAYS_OF_WEEK[msg.day-1];
-  ov.querySelector('.him-react').innerHTML = msg.react;
-  const btn = ov.querySelector('.him-dismiss');
-  btn.textContent = msg.final ? 'BREATHE' : (msg.fromMe ? 'SENT' : 'READ');
-  const close = () => {
-    ov.classList.remove('show');
-    btn.removeEventListener('click', close);
-    if (onDismiss) onDismiss();
-  };
-  btn.addEventListener('click', close);
-  ov.classList.add('show');
-  // dramatic sounds
-  sfx('slack');
-  setTimeout(() => sfx('pop'), 220);
-  if (msg.final) {
-    setTimeout(() => sfx('coin'), 600);
-  }
-}
-
-function fireHimIfDue() {
-  if (G.himPaused) return;
-  // Find next message matching current day + time slot
-  const nextIdx = G.himStoryIndex || 0;
-  if (nextIdx >= HIM_STORY.length) return;
-  const next = HIM_STORY[nextIdx];
-  if (next.day !== G.day) return;
-  // 45-second workday split: AM = first 18s, PM = 25s onward
-  const isAM = next.slot === 'AM';
-  const threshold = isAM ? 6 : 24;
-  if (G.workTime < threshold) return;
-
-  // Fire
-  G.himPaused = true;
-  G.himStoryIndex = nextIdx + 1;
-  // Effects apply on dismiss
-  showHimMessage(next, () => {
-    G.fun = Math.max(0, Math.min(100, G.fun + (next.fun || 0)));
-    G.focus = Math.max(0, Math.min(100, G.focus + (next.focus || 0)));
-    G.boss = Math.max(0, Math.min(100, G.boss + (next.boss || 0)));
-    G.himPaused = false;
-    // Also write a dialogue echo for continuity
-    setDialogue('ZHENG', next.react);
-    updateFocusBtnLock();
-  });
-}
+// (legacy showHimMessage + fireHimIfDue removed — tree-based system above is the active one)
 
 // ------- Palette (dusty atmospheric pixel art) -------
 const C = {

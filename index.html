@@ -523,7 +523,7 @@
     <button class="btn" style="margin-top:24px" onclick="startGame()">START DAY 1</button>
   </div>
 </div>
-<div id="version-footer">v1.9 — corpo cat</div>
+<div id="version-footer">v2.0 — corpo cat</div>
 
 <script>
 // ============================================================
@@ -1261,32 +1261,9 @@ function showEveningNode(pathKey) {
         G.himEveningPath = (G.himEveningPath || '') + String(idx);
         setDialogue('ZHENG', opt.react);
         if (opt.end) {
+          // Store the final ending codes — the dedicated HIM-recap screen
+          // (shown after Friday bedtime) will compose + display them.
           G.himEveningEnding = opt.end;
-          const dEnd = HIM_ENDINGS[G.himEnding];
-          const eFrag = HIM_EVENING_ENDINGS[opt.end];
-          // Check for the ONE secret TOGETHER ending out of 1024
-          const isTogether = (G.himPath === TOGETHER_PATH.daytime) &&
-                             (G.himEveningPath === TOGETHER_PATH.evening);
-          setTimeout(() => {
-            if (isTogether) {
-              sfx('win'); setTimeout(() => sfx('win'), 600);
-              setDialogue(
-                '<span style="color:#ffd166;">🌹 TOGETHER.</span>',
-                '<i>six months later he\'s cooking eggs in your kitchen. kinu tolerates him, just barely. ' +
-                'you still don\'t know if this lasts — but you\'re here, and it\'s warm, and he shows up when he says he will. ' +
-                'anna says "i still don\'t trust him" every brunch. you say "i know." you smile anyway.</i>' +
-                '<br><br><span style="color:#6ad4c4;font-weight:bold;">YOU FOUND THE 1-IN-1024 ENDING.</span>' +
-                '<br><span style="color:#999;">(path: ' + G.himPath + '/' + G.himEveningPath + ')</span>'
-              );
-              return;
-            }
-            setDialogue(
-              '<span style="color:#6ad4c4;">ENDING:</span> ' + (dEnd ? dEnd.title : 'THE WEEK'),
-              '<i>' + (dEnd ? dEnd.text : 'the week.') + '</i><br><br>' +
-              '<span style="color:#ffd166;">and at night:</span> <i>' + eFrag + '</i><br><br>' +
-              '<span style="color:#999;">(path: ' + (G.himPath || '') + '/' + (G.himEveningPath || '') + ' — 1 of 1024)</span>'
-            );
-          }, 1400);
         }
         startBedtime();
       };
@@ -4410,10 +4387,9 @@ function tickBedtime(dt) {
     b.fadeAlpha = Math.min(1, b.t / 1.2);
     if (b.fadeAlpha >= 1) {
       b.phase = 'done';
-      // Friday night: the week is over. Evaluate goal + end.
+      // Friday night: the week is over. Show HIM recap FIRST, then win/lose.
       if (b.isFinalNight) {
-        if (G.money >= G.goal) winGame();
-        else loseGame();
+        showHimRecap();
       } else {
         G.day++;
         startMorning();
@@ -4563,6 +4539,100 @@ function loseGame() {
   addButton('PLAY AGAIN', 'alt', () => location.reload());
 }
 
+// =====================================================
+// HIM RECAP SCREEN — shown after bedtime fade on Friday
+// Before the final win/lose scene. Shows the closure of
+// the situationship, with a Spain-variant coda.
+// =====================================================
+function showHimRecap() {
+  G.state = 'him-recap';
+  clearActions();
+  clearDistractions();
+  statsBar.classList.add('hidden');
+  canvas.onclick = null;
+
+  const goingToSpain = G.money >= G.goal;
+  const isTogether = (G.himPath === TOGETHER_PATH.daytime) &&
+                     (G.himEveningPath === TOGETHER_PATH.evening);
+
+  let title, body;
+
+  if (isTogether) {
+    title = '🌹 TOGETHER.';
+    body = 'six months later he is cooking eggs in your kitchen. kinu tolerates him, barely. ' +
+      'anna still says "i don\'t trust him" every brunch. you smile anyway. ' +
+      '<span style="color:#6ad4c4;font-weight:bold;">YOU FOUND THE 1-IN-1024 ENDING.</span>';
+  } else if (G.brokeUpWithHim && G.himEnding) {
+    const dEnd = HIM_ENDINGS[G.himEnding];
+    title = '💔 ' + (dEnd ? dEnd.title : 'YOU BROKE IT OFF');
+    body = dEnd ? dEnd.text : 'you ended it. good.';
+  } else if (G.himEnding && G.himEveningEnding) {
+    const dEnd = HIM_ENDINGS[G.himEnding];
+    const eFrag = HIM_EVENING_ENDINGS[G.himEveningEnding];
+    title = dEnd.title;
+    body = dEnd.text + '<br><br><span style="color:#ffd166;">and at night:</span> <i>' + eFrag + '</i>';
+  } else if (G.himEnding) {
+    const dEnd = HIM_ENDINGS[G.himEnding];
+    title = dEnd.title;
+    body = dEnd.text;
+  } else {
+    // Defensive fallback — player never completed the HIM arc
+    title = 'THE WEEK, WITH HIM';
+    body = 'he texted sometimes. you replied sometimes. nothing was decided. the week just ended.';
+  }
+
+  // Spain-variant coda — the actual ending of the situationship is
+  // flavored by whether Zheng is getting on the plane or not.
+  let spainCoda;
+  if (isTogether) {
+    spainCoda = goingToSpain
+      ? 'you fly to malaga sunday morning. he texts "have fun 🫶" — you reply "i will 🌹" from 33,000 ft. he\'ll be there when you get back.'
+      : 'the girls fly to malaga without you. but this weekend he is here, and he is yours, and he brings you coffee in bed. it is somehow enough.';
+  } else if (goingToSpain) {
+    spainCoda = 'sunday morning: you board the flight to malaga with anna, lena, susan. ' +
+      'he texts "have fun 🫶" at 8:04am. you see it from 33,000 feet, second glass of cava, ' +
+      'and you do not reply. you post a photo of the coast. he watches. you don\'t look.';
+  } else {
+    spainCoda = 'sunday morning: the girls land in malaga without you. ' +
+      'he texts "have fun" at 8:04am. you reply "something came up 💔" from your couch. ' +
+      'nothing came up. you just could not. kinu vomits at 10:12am. the cycle resumes.';
+  }
+
+  setDialogue(
+    '<span style="color:#ff3d7f;">HIM — the week in review.</span>',
+    '<b style="color:#ffd166;">' + title + '</b><br>' +
+    '<i>' + body + '</i><br><br>' +
+    '<span style="color:#6ad4c4;">and on sunday:</span><br>' +
+    '<i>' + spainCoda + '</i>'
+  );
+  addButton('CONTINUE →', 'alt', () => {
+    if (goingToSpain) winGame();
+    else loseGame();
+  });
+  sfx('slack');
+}
+
+function drawHimRecap() {
+  // Faded dark night backdrop — like bedtime faded out
+  ctx.fillStyle = '#0a0612';
+  ctx.fillRect(0, 0, W, H);
+  // Soft phone-screen glow at the center
+  const g = ctx.createRadialGradient(W/2, H/2 - 40, 40, W/2, H/2 - 40, 360);
+  g.addColorStop(0, 'rgba(255, 107, 157, 0.18)');
+  g.addColorStop(1, 'rgba(255, 107, 157, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // A lone phone icon floating
+  px(W/2 - 24, H/2 - 80, 48, 80, '#1a0a20');
+  px(W/2 - 20, H/2 - 76, 40, 68, '#2a1a30');
+  // A broken-heart-ish dot on the screen
+  ctx.fillStyle = '#ff3d7f';
+  ctx.font = '28px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('💔', W/2, H/2 - 30);
+  ctx.textAlign = 'left';
+}
+
 function drawLoseScene() {
   // Dark empty room, Zheng on the couch scrolling, Spain light on his face
   ctx.fillStyle = '#1a0a18';
@@ -4642,6 +4712,7 @@ function render() {
     ctx.fillRect(0,0,W,H);
   }
   else if (G.state === 'bedtime') drawBedtime();
+  else if (G.state === 'him-recap') drawHimRecap();
   else if (G.state === 'win') drawWinScene();
   else if (G.state === 'lose') drawLoseScene();
 }

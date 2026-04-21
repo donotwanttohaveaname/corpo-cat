@@ -706,6 +706,8 @@ const G = {
   himStoryIndex: 0,
   himPath: '',
   himEnding: null,
+  himEveningPath: '',
+  himEveningEnding: null,
   brokeUpWithHim: false,
   _himFiredToday: 0,
   himPaused: false,
@@ -993,6 +995,254 @@ const HIM_ENDINGS = {
   'buzzed-up':       { breakup: false, title: 'BUZZED UP', text: 'You buzzed him in. Kinu was disappointed. She left the room. You noticed but did not leave yours.' },
   'walked-away':     { breakup: true,  title: 'WALKED AWAY', text: 'You said "go home". Watched him leave from the window. Cried. The good kind. Kinu purred on your chest.' },
 };
+
+// ==========================================================
+// EVENING tree — 5 nighttime decisions. 5 daytime + 5 evening = 10 bits = 1024 endings.
+// Fires at bedtime (SLEEP button) if player hasn't broken up yet.
+// ==========================================================
+const HIM_EVENING_TREE = {
+  '': { day: 1, time: '23:14', his: 'u up? 👀', opts: [
+    { label: '*leave on read*', reply: '(left on read)', react: 'saw it. didn\'t reply. kept scrolling. sort of powerful.', fun: +14, focus: -8, boss: 0 },
+    { label: '"hi"', reply: 'hi', react: 'one letter too many. he\'s typing. i can hear it.', fun: +18, focus: -14, boss: +4 },
+  ]},
+  '0': { day: 2, time: '00:47', his: 'cant sleep. thinking about u 🌙', opts: [
+    { label: '"same"', reply: 'same', react: 'it\'s 12:47am. i am LYING. i was asleep. i\'m awake now.', fun: +20, focus: -14, boss: +4 },
+    { label: '"go to sleep 😴"', reply: 'go to sleep 😴', react: 'sent a whole ass "go to sleep" like a parent. he replied "make me".', fun: +26, focus: -10, boss: +4 },
+  ]},
+  '1': { day: 2, time: '22:38', his: 'sorry for yesterday. u ok?', opts: [
+    { label: '"yeah 🙂"', reply: 'yeah 🙂', react: 'a smile emoji with secrets behind it. award-winning.', fun: +16, focus: -8, boss: +2 },
+    { label: '"not really"', reply: 'not really, but it\'s ok', react: 'gave him the truth AND the permission slip. he didn\'t ask follow-ups.', fun: +10, focus: -10, boss: +4 },
+  ]},
+  '00': { day: 3, time: '01:22', his: 'drunk. miss u. 😔🍷', opts: [
+    { label: '"come over"', reply: 'come over', react: 'invited a drunk man at 1am. the version of me my therapist warned about.', fun: +30, focus: -22, boss: +8 },
+    { label: '"drink water"', reply: 'drink water. sleep.', react: 'maternal. he called me "angel" which i will think about all week.', fun: +18, focus: -8, boss: +2 },
+  ]},
+  '01': { day: 3, time: '22:49', his: 'what r u wearing 👀', opts: [
+    { label: '"nothing"', reply: 'nothing', react: 'sent it from the couch in my pajamas. art.', fun: +30, focus: -18, boss: +6 },
+    { label: '"a wedding dress 👰‍♂️"', reply: 'a wedding dress 👰‍♂️', react: 'derailed with absurdity. he sent 7 laughing emojis. points for me.', fun: +24, focus: -8, boss: +2 },
+  ]},
+  '10': { day: 3, time: '23:17', his: 'hmm ok. miss ur voice tho', opts: [
+    { label: '"call me"', reply: 'call me', react: 'he didn\'t call. i\'m still holding the phone like he will.', fun: +14, focus: -20, boss: +6 },
+    { label: '"you have it in a voice note from march"', reply: 'you have a voice note from march', react: 'historical receipts. brutal. he didn\'t reply.', fun: +22, focus: -6, boss: +2 },
+  ]},
+  '11': { day: 3, time: '00:04', his: 'respect. goodnight 🖤', opts: [
+    { label: '"goodnight 🖤"', reply: 'goodnight 🖤', react: 'two hearts, matched. felt like closure. wasn\'t closure.', fun: +20, focus: -6, boss: +2 },
+    { label: '*read, no reply*', reply: '(read. no reply.)', react: 'gave him a taste of the quiet. it\'s powerful in small doses.', fun: +18, focus: -4, boss: +2 },
+  ]},
+  '000': { day: 4, time: '02:33', his: 'u awake? cant stop thinking abt u 😩', opts: [
+    { label: '"address?"', reply: 'address? 🔑', react: 'full booty call mode. zero defenses. zero regrets (for now).', fun: +34, focus: -26, boss: +10 },
+    { label: '"not tonight"', reply: 'not tonight', react: 'the first "no" of the week. muscle memory: nonexistent. tears: plentiful.', fun: +18, focus: -4, boss: 0 },
+  ]},
+  '001': { day: 4, time: '22:12', his: 'wat r u doing rn 🙈', opts: [
+    { label: '"waiting for you ofc"', reply: 'waiting for you ofc', react: 'pathetic. accurate. he saw it and didn\'t reply for 47 min.', fun: +8, focus: -22, boss: +8 },
+    { label: '"taking my own advice"', reply: 'taking my own advice', react: 'referenced "drink water". he replied "lol ur so cute" — not an answer.', fun: +18, focus: -6, boss: +2 },
+  ]},
+  '010': { day: 4, time: '23:31', his: 'ok but like. for real. are we something?', opts: [
+    { label: '"you tell me"', reply: 'you tell me', react: 'handed him the mic. dead air for 22 min. he answered "idk 😔".', fun: -2, focus: -22, boss: +8 },
+    { label: '"no. we\'re a pattern."', reply: 'no. we\'re a pattern.', react: 'diagnosed us aloud. he went silent. he\'ll call this "dramatic".', fun: +34, focus: -4, boss: 0 },
+  ]},
+  '011': { day: 4, time: '01:17', his: 'u make me laugh so hard. no one else does', opts: [
+    { label: '"that\'s because i\'m funny"', reply: 'that\'s because i\'m funny 💅', react: 'accepted the compliment WITHOUT a self-deprecating follow-up. growth.', fun: +28, focus: -10, boss: +4 },
+    { label: '"then maybe spend time with me"', reply: 'then maybe spend time with me', react: 'LOL. the cleanest dare. he wrote a paragraph back that said nothing.', fun: +20, focus: -12, boss: +4 },
+  ]},
+  '100': { day: 4, time: '23:58', his: 'u still there?', opts: [
+    { label: '"yeah"', reply: 'yeah', react: 'still here. always here. that\'s the problem.', fun: +10, focus: -14, boss: +4 },
+    { label: '"no"', reply: 'no', react: '"no." he replied "haha u\'re funny" — i was not being funny.', fun: +26, focus: -4, boss: 0 },
+  ]},
+  '101': { day: 4, time: '22:22', his: 'ok hear me out — spain trip w/ me?', opts: [
+    { label: '"send me the dates"', reply: 'send me the dates 👀', react: 'he\'s going to send the dates. he\'s not going to send the dates.', fun: +32, focus: -20, boss: +8 },
+    { label: '"i\'m already going, with my girlies"', reply: 'i\'m already going. with my girlies.', react: 'one of the best sentences i\'ve ever typed. he replied "oh 😔" — CORRECT.', fun: +38, focus: -2, boss: 0 },
+  ]},
+  '110': { day: 4, time: '00:44', his: 'stop being so cool lol', opts: [
+    { label: '"can\'t, sorry"', reply: 'can\'t, sorry', react: 'i wasn\'t even trying. that\'s the scary part.', fun: +30, focus: -6, boss: +2 },
+    { label: '"text me when you\'re ready to meet"', reply: 'text me when you\'re ready to meet', react: 'a boundary with a return address. he hearted it. doesn\'t count.', fun: +22, focus: -10, boss: +4 },
+  ]},
+  '111': { day: 4, time: '23:07', his: 'ur kinda intimidating. i like it.', opts: [
+    { label: '"i know"', reply: 'i know', react: 'two words again. different strain. still undefeated.', fun: +32, focus: -4, boss: 0 },
+    { label: '"too late to flatter"', reply: 'too late to flatter', react: 'polished rejection. he sent "ouch 😅" — correct response.', fun: +30, focus: -2, boss: 0 },
+  ]},
+  '0000': { day: 5, time: '02:04', his: '[image attached]', opts: [
+    { label: 'open it', reply: '(opened)', react: 'it was him shirtless, mirror. forwarded to anna who replied "NO.".', fun: +28, focus: -24, boss: +10, end: '0000-0' },
+    { label: '*delete unopened*', reply: '(deleted)', react: 'never opened. never tempted. new personality unlocked.', fun: +36, focus: +12, boss: -4, end: '0000-1' },
+  ]},
+  '0001': { day: 5, time: '22:14', his: 'so what\'s the plan this week', opts: [
+    { label: '"you\'re not in the plans"', reply: 'you\'re not in the plans.', react: 'final draft. he went silent. i slept 9 hours.', fun: +42, focus: +18, boss: -6, end: '0001-0' },
+    { label: '"i don\'t make plans anymore"', reply: 'i don\'t make plans anymore', react: 'existential. hot. he replied "??? u ok" — not my problem.', fun: +24, focus: -2, boss: 0, end: '0001-1' },
+  ]},
+  '0010': { day: 5, time: '00:01', his: 'thinking about u', opts: [
+    { label: '"stop"', reply: 'stop', react: 'single word, no punctuation, devastating. he didn\'t respond.', fun: +34, focus: +4, boss: -2, end: '0010-0' },
+    { label: '"same"', reply: 'same', react: 'same trap, same week. the rug is worn through.', fun: +8, focus: -24, boss: +10, end: '0010-1' },
+  ]},
+  '0011': { day: 5, time: '23:48', his: 'ok just tell me ur still interested', opts: [
+    { label: '"i\'m not"', reply: 'i\'m not.', react: 'a surgical two-word ending. he typed for 8 minutes. sent nothing.', fun: +44, focus: +20, boss: -8, end: '0011-0' },
+    { label: '"mostly"', reply: 'mostly', react: 'kept the door cracked. cracks widen. this will spiral.', fun: +14, focus: -18, boss: +8, end: '0011-1' },
+  ]},
+  '0100': { day: 5, time: '01:12', his: 'u free sat?', opts: [
+    { label: '"i\'m in spain"', reply: 'i\'m in spain 🌊', react: 'malaga. 3 days out. he replied "wait what" — WAIT WHAT INDEED.', fun: +42, focus: +10, boss: -4, end: '0100-0' },
+    { label: '"yeah for you"', reply: 'yeah for you', react: 'immediately available. he said "maybe" and i died inside a little.', fun: +6, focus: -22, boss: +8, end: '0100-1' },
+  ]},
+  '0101': { day: 5, time: '22:58', his: 'my friends wanna meet u', opts: [
+    { label: '"love that"', reply: 'love that ❤️', react: 'meeting friends of a situationship on a friday night. a classic mistake.', fun: +16, focus: -20, boss: +8, end: '0101-0' },
+    { label: '"meet mine first"', reply: 'meet mine first. susan hates you.', react: 'threatened him with susan. masterful.', fun: +36, focus: -2, boss: 0, end: '0101-1' },
+  ]},
+  '0110': { day: 5, time: '00:33', his: 'i had a dream about u', opts: [
+    { label: '"was i leaving?"', reply: 'was i leaving?', react: 'the cleanest clapback of the week. he didn\'t answer.', fun: +40, focus: +4, boss: -2, end: '0110-0' },
+    { label: '"tell me"', reply: 'tell me everything', react: 'asked for the full story. he said "nvm" — classic non-investor.', fun: -4, focus: -20, boss: +8, end: '0110-1' },
+  ]},
+  '0111': { day: 5, time: '23:22', his: 'u up? can i be honest', opts: [
+    { label: '"no"', reply: 'no', react: 'the single-syllable weapon. he typed "ok…" with the dots of a dying man.', fun: +40, focus: +6, boss: -4, end: '0111-0' },
+    { label: '"try me"', reply: 'try me', react: 'he admitted he "might have feelings". then logged off. then on. then off.', fun: +22, focus: -12, boss: +6, end: '0111-1' },
+  ]},
+  '1000': { day: 5, time: '01:44', his: 'y did u ignore me yday', opts: [
+    { label: '"because i needed to"', reply: 'because i needed to', react: 'a full sentence about ME. bold. new.', fun: +32, focus: +4, boss: -2, end: '1000-0' },
+    { label: '"ignoring?? me??"', reply: 'ignoring?? me?? i thought we were playing hard to get ❤️', react: 'talked him out of it. and back in. cycle: intact.', fun: +10, focus: -24, boss: +10, end: '1000-1' },
+  ]},
+  '1001': { day: 5, time: '22:41', his: 'ok for real let\'s do this. dinner. no friends. just us', opts: [
+    { label: '"finally."', reply: 'finally.', react: '9 days late. took it. we\'ll see on saturday.', fun: +28, focus: -10, boss: +4, end: '1001-0' },
+    { label: '"too late 🫡"', reply: 'too late 🫡', react: 'saluted him goodbye. he replied "ok bitch" — FAIR.', fun: +46, focus: +18, boss: -8, end: '1001-1' },
+  ]},
+  '1010': { day: 5, time: '23:29', his: 'was the voice note thing abt what i think', opts: [
+    { label: '"yes"', reply: 'yes.', react: 'caught. i made him sit with it. he sat with it badly.', fun: +38, focus: 0, boss: 0, end: '1010-0' },
+    { label: '"don\'t worry about it"', reply: 'don\'t worry about it', react: 'let him off the hook. old habits. warm bed.', fun: +12, focus: -18, boss: +6, end: '1010-1' },
+  ]},
+  '1011': { day: 5, time: '00:17', his: 'fine. i\'ll stop texting.', opts: [
+    { label: '"finally ✨"', reply: 'finally ✨', react: 'he didn\'t stop. but for one night the threat was beautiful.', fun: +32, focus: +2, boss: -2, end: '1011-0' },
+    { label: '"nooo please don\'t"', reply: 'nooo please don\'t 🥺', react: 'UNDID it in 0.4 seconds. monday-me is ashamed of thursday-me.', fun: +6, focus: -26, boss: +12, end: '1011-1' },
+  ]},
+  '1100': { day: 5, time: '02:11', his: 'u asleep?', opts: [
+    { label: '*silence*', reply: '(never replied)', react: 'did not reply. ever. slept beautifully.', fun: +40, focus: +18, boss: -8, end: '1100-0' },
+    { label: '"no. never. why"', reply: 'no. never. why', react: 'i am, as always, available. a 24/7 convenience store.', fun: +8, focus: -22, boss: +10, end: '1100-1' },
+  ]},
+  '1101': { day: 5, time: '22:50', his: 'lol ur still cold?', opts: [
+    { label: '"not cold. done."', reply: 'not cold. done.', react: 'the line of the week. he replied "ok." — PUNCTUATION. one dot.', fun: +48, focus: +20, boss: -10, end: '1101-0' },
+    { label: '"a bit 😏"', reply: 'a bit 😏', react: 'flirted back. cycle: re-engaged. me: tired.', fun: +22, focus: -12, boss: +6, end: '1101-1' },
+  ]},
+  '1110': { day: 5, time: '23:59', his: 'ok i\'m gonna stop now. take care of urself.', opts: [
+    { label: '"you too"', reply: 'you too', react: 'civil. graceful. felt like an ending. wasn\'t sure who ended it.', fun: +36, focus: +8, boss: -4, end: '1110-0' },
+    { label: '"wait"', reply: 'wait', react: 'said "wait" for no reason. nothing to add. just wait.', fun: +10, focus: -20, boss: +8, end: '1110-1' },
+  ]},
+  '1111': { day: 5, time: '00:00', his: 'last message i promise. i was wrong about a lot.', opts: [
+    { label: '"noted."', reply: 'noted.', react: 'one word, punctuated. i am the professional now.', fun: +48, focus: +20, boss: -10, end: '1111-0' },
+    { label: '"thank you"', reply: 'thank you', react: 'gave him the gift of a reply. he needed it. i gave it. free.', fun: +34, focus: +10, boss: -4, end: '1111-1' },
+  ]},
+};
+
+// 32 evening ending fragments — combined with 32 daytime endings = 1024 outcomes
+const HIM_EVENING_ENDINGS = {
+  '0000-0': 'a 2am shirtless-mirror picture. forwarded to anna. you\'ll laugh in malaga.',
+  '0000-1': 'never opened the photo. never will. a quiet superpower.',
+  '0001-0': '"you\'re not in the plans" — a life motto now.',
+  '0001-1': 'he\'s still wondering what "i don\'t make plans anymore" meant.',
+  '0010-0': 'one word — "stop" — and he has not texted since.',
+  '0010-1': 'he says "thinking about u" every week. you say "same" every week.',
+  '0011-0': 'he typed for 8 minutes after "i\'m not." you slept through it.',
+  '0011-1': '"mostly" kept you in it for another four months.',
+  '0100-0': 'told him you\'re in spain. you will be. in 3 days.',
+  '0100-1': 'available saturday. sunday. for his convenience, always.',
+  '0101-0': 'met his friends on a friday. regretted it by dessert.',
+  '0101-1': 'threatened him with susan. susan loved this.',
+  '0110-0': 'asked if you were leaving in the dream. cleanest question you\'ve ever asked.',
+  '0110-1': 'asked him for the dream. he said "nvm". classic.',
+  '0111-0': 'one word — "no" — and he typed 20 minutes before giving up.',
+  '0111-1': '"he might have feelings" became three more weeks of nothing.',
+  '1000-0': '"because i needed to" — a whole sentence about yourself. tattoo-worthy.',
+  '1000-1': 'talked yourself out of the ignore. back in the loop by 2am.',
+  '1001-0': 'took the dinner offer. we\'ll see.',
+  '1001-1': 'saluted him goodbye. he called you a bitch. you framed it.',
+  '1010-0': '"yes" to the voice-note question. he squirmed. you smiled.',
+  '1010-1': 'let him off the hook. you\'re good at letting him off hooks.',
+  '1011-0': 'he threatened to stop. hottest thing he ever wrote.',
+  '1011-1': 'begged him not to stop. undid a week in 0.4 seconds.',
+  '1100-0': 'never replied. ever. slept 9 hours. free.',
+  '1100-1': 'available at 2am, as always. 24/7 store.',
+  '1101-0': '"not cold. done." he replied with a single period. glorious.',
+  '1101-1': 'flirted back. cycle re-engaged. you\'re tired.',
+  '1110-0': 'a civil goodbye. felt like an ending. not sure who ended it.',
+  '1110-1': 'said "wait" for no reason. nothing to add.',
+  '1111-0': '"noted." — professional.',
+  '1111-1': '"thank you" — a parting gift. free. he needed it.',
+};
+
+function showEveningNode(pathKey) {
+  const node = HIM_EVENING_TREE[pathKey];
+  if (!node) { G.himPaused = false; startBedtime(); return; }
+  const ov = document.getElementById('him-overlay');
+  const thread = ov.querySelector('.him-thread');
+  thread.innerHTML = '';
+  const b = document.createElement('div');
+  b.className = 'him-msg';
+  b.textContent = node.his;
+  thread.appendChild(b);
+  ov.querySelector('.him-time').textContent = node.time + ' · ' + DAYS_OF_WEEK[node.day-1] + ' NIGHT';
+  ov.querySelector('.him-react').innerHTML = '';
+  const oldBtns = ov.querySelector('.him-options');
+  if (oldBtns) oldBtns.remove();
+  const dismissBtn = ov.querySelector('.him-dismiss');
+  dismissBtn.style.display = 'none';
+  const optsWrap = document.createElement('div');
+  optsWrap.className = 'him-options';
+  optsWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:12px;';
+  node.opts.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'him-dismiss';
+    btn.textContent = opt.label;
+    btn.style.cssText = 'margin:0;width:100%;font-size:12px;padding:9px 10px;';
+    btn.onclick = () => {
+      optsWrap.remove();
+      const r = document.createElement('div');
+      r.className = 'him-msg me';
+      r.textContent = opt.reply;
+      thread.appendChild(r);
+      ov.querySelector('.him-react').innerHTML = opt.react;
+      dismissBtn.style.display = 'block';
+      dismissBtn.textContent = opt.end ? 'GOODNIGHT' : 'CONTINUE';
+      dismissBtn.onclick = () => {
+        ov.classList.remove('show');
+        G.fun = Math.max(0, Math.min(100, G.fun + (opt.fun || 0)));
+        G.focus = Math.max(0, Math.min(100, G.focus + (opt.focus || 0)));
+        G.boss = Math.max(0, Math.min(100, G.boss + (opt.boss || 0)));
+        G.himPaused = false;
+        G.himEveningPath = (G.himEveningPath || '') + String(idx);
+        setDialogue('ZHENG', opt.react);
+        if (opt.end) {
+          G.himEveningEnding = opt.end;
+          const dEnd = HIM_ENDINGS[G.himEnding];
+          const eFrag = HIM_EVENING_ENDINGS[opt.end];
+          setTimeout(() => {
+            setDialogue(
+              '<span style="color:#6ad4c4;">ENDING:</span> ' + (dEnd ? dEnd.title : 'THE WEEK'),
+              '<i>' + (dEnd ? dEnd.text : 'the week.') + '</i><br><br>' +
+              '<span style="color:#ffd166;">and at night:</span> <i>' + eFrag + '</i><br><br>' +
+              '<span style="color:#999;">(path: ' + (G.himPath || '') + '/' + (G.himEveningPath || '') + ' — 1 of 1024)</span>'
+            );
+          }, 1400);
+        }
+        startBedtime();
+      };
+    };
+    optsWrap.appendChild(btn);
+  });
+  ov.querySelector('.him-phone').appendChild(optsWrap);
+  ov.classList.add('show');
+  sfx('slack');
+  setTimeout(() => sfx('pop'), 220);
+}
+
+function fireEveningHim() {
+  // Called when player clicks SLEEP. If no breakup, show evening message first.
+  if (G.brokeUpWithHim || G.himEnding) {
+    startBedtime();
+    return;
+  }
+  const evPath = G.himEveningPath || '';
+  const targetDay = evPath.length + 1;
+  if (targetDay > 5 || targetDay !== G.day) {
+    startBedtime();
+    return;
+  }
+  G.himPaused = true;
+  showEveningNode(evPath);
+}
 
 // Legacy — kept for compat (unused by new tree flow)
 const HIM_STORY = [
@@ -3987,7 +4237,7 @@ function endWorkDay() {
   }
 
   addButton('GO HOME → SLEEP', 'alt', () => {
-    startBedtime();
+    fireEveningHim();
   });
 }
 

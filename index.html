@@ -1,0 +1,4336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpo Cat — Zheng's Workday</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #120a1a;
+    font-family: 'Courier New', Courier, monospace;
+    color: #f5d5e0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    user-select: none;
+  }
+  #game {
+    position: relative;
+    width: 800px;
+    height: 600px;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 4px solid #ff6b9d;
+    background: #2a1e3a;
+    display: block;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    pointer-events: none;
+    font-size: 13px;
+  }
+  .pill {
+    background: rgba(10,5,20,0.78);
+    border: 2px solid #ff6b9d;
+    padding: 6px 10px;
+    letter-spacing: 1px;
+  }
+  #dialogue {
+    position: absolute;
+    bottom: 18px;
+    left: 18px;
+    right: 18px;
+    background: rgba(10,5,20,0.92);
+    border: 3px solid #ff6b9d;
+    padding: 12px 16px;
+    min-height: 62px;
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: 0.5px;
+  }
+  #dialogue .who { color: #ffd166; font-weight: bold; }
+  #actions {
+    position: absolute;
+    bottom: 138px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 0 20px;
+    z-index: 15;
+  }
+  .btn {
+    background: #ff6b9d;
+    border: 3px solid #fff;
+    color: #1a0a20;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1px;
+    box-shadow: 4px 4px 0 #7a0e3d;
+    transition: transform 0.05s;
+  }
+  .btn:hover { background: #ffa8c6; }
+  .btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #7a0e3d; }
+  .btn.alt { background: #6ad4c4; color: #0a1a20; box-shadow: 4px 4px 0 #1e5e52; }
+  .btn.alt:hover { background: #a5ebe0; }
+  .btn.warn { background: #ffd166; color: #1a0a20; box-shadow: 4px 4px 0 #8a6a12; }
+  .btn.warn:hover { background: #ffe0a0; }
+  .btn.spank { background: #ff3d7f; color: #fff; box-shadow: 4px 4px 0 #5a0a2a; border-color: #fff; }
+  .btn.spank:hover { background: #ff70a0; }
+  #smack {
+    position: absolute;
+    pointer-events: none;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 72px;
+    color: #ffd166;
+    text-shadow: 4px 4px 0 #c04574, 8px 8px 0 #1a0a20;
+    transform: rotate(-12deg);
+    opacity: 0;
+    transition: opacity 0.15s;
+    letter-spacing: 4px;
+    z-index: 30;
+  }
+  #smack.show { opacity: 1; animation: smackPop 0.5s ease-out; }
+  @keyframes smackPop {
+    0%   { transform: rotate(-12deg) scale(0.3); opacity: 0; }
+    30%  { transform: rotate(-8deg) scale(1.3); opacity: 1; }
+    70%  { transform: rotate(-12deg) scale(1); opacity: 1; }
+    100% { transform: rotate(-15deg) scale(0.9); opacity: 0; }
+  }
+  @keyframes shakeGame {
+    0%,100% { transform: translate(0,0); }
+    20%     { transform: translate(-6px, 2px); }
+    40%     { transform: translate(5px, -3px); }
+    60%     { transform: translate(-4px, 3px); }
+    80%     { transform: translate(3px, -2px); }
+  }
+  #game.shaking { animation: shakeGame 0.35s; }
+
+  /* The big spiral overlay — takes over the screen when Zheng breaks */
+  #spiral-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  #spiral-overlay.show { opacity: 1; }
+  #spiral-overlay .dim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(255,0,80,0.15) 0%, rgba(0,0,0,0.75) 80%);
+    animation: spiralPulse 0.4s infinite alternate;
+  }
+  @keyframes spiralPulse {
+    from { filter: hue-rotate(0deg) saturate(1); }
+    to   { filter: hue-rotate(-20deg) saturate(1.4); }
+  }
+  #spiral-overlay .word {
+    position: relative;
+    font-family: 'Courier New', monospace;
+    font-weight: 900;
+    font-size: 160px;
+    color: #ff3d7f;
+    letter-spacing: 10px;
+    text-shadow:
+       6px  0 0 rgba(255, 209, 102, 0.9),
+      -6px  0 0 rgba(106, 212, 196, 0.9),
+       0   4px 0 #1a0a20,
+       0   0 60px rgba(255, 60, 120, 0.8);
+    animation: spiralJitter 0.1s infinite;
+  }
+  @keyframes spiralJitter {
+    0%   { transform: translate(-2px, 0) rotate(-2deg); }
+    25%  { transform: translate(3px, 2px) rotate(1deg); }
+    50%  { transform: translate(-1px, -3px) rotate(3deg) scale(1.03); }
+    75%  { transform: translate(2px, 1px) rotate(-1deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+  #spiral-overlay .sub {
+    position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #ffd5e0;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px rgba(255, 60, 120, 0.8);
+    opacity: 0.85;
+  }
+
+  /* ==== HIM story-arc overlay — unskippable imessage-style notification ==== */
+  #him-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.82);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, 'Segoe UI', 'Courier New', monospace;
+  }
+  #him-overlay.show { display: flex; animation: himFadeIn 0.25s ease-out; }
+  @keyframes himFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .him-phone {
+    width: 340px;
+    background: #0a0a0e;
+    border: 4px solid #ff3d7f;
+    border-radius: 28px;
+    padding: 18px 18px 20px;
+    box-shadow: 0 0 80px rgba(255, 60, 120, 0.7), inset 0 0 0 2px #1a0a20;
+    animation: phoneBuzz 0.18s infinite alternate;
+  }
+  @keyframes phoneBuzz {
+    from { transform: translate(-2px, 0) rotate(-0.6deg); }
+    to   { transform: translate(2px, -1px) rotate(0.8deg); }
+  }
+  .him-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #ff3d7f;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    animation: him-flash 0.8s infinite;
+  }
+  @keyframes him-flash {
+    0%, 100% { background: #ff3d7f; color: #fff; }
+    50%      { background: #ffd166; color: #1a0a20; }
+  }
+  .him-contact {
+    color: #fff;
+    font-size: 17px;
+    font-weight: bold;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #2a1a30;
+    padding-bottom: 10px;
+  }
+  .him-contact .avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff6b9d, #4a78c0);
+    flex-shrink: 0;
+  }
+  .him-msg {
+    background: #2a2a34;
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 18px 18px 18px 4px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    line-height: 1.35;
+    max-width: 78%;
+    word-wrap: break-word;
+  }
+  .him-msg.me {
+    background: #0a84ff;
+    border-radius: 18px 18px 4px 18px;
+    margin-left: auto;
+  }
+  .him-time {
+    color: #666;
+    font-size: 10px;
+    text-align: center;
+    margin: 2px 0 8px;
+    letter-spacing: 1px;
+  }
+  .him-react {
+    text-align: center;
+    color: #ffd166;
+    font-size: 13px;
+    margin: 14px 6px;
+    font-style: italic;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+  }
+  .him-dismiss {
+    display: block;
+    margin: 10px auto 0;
+    background: #ff6b9d;
+    color: #fff;
+    font-weight: bold;
+    border: 3px solid #fff;
+    padding: 8px 28px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1.5px;
+    box-shadow: 3px 3px 0 #1a0a20;
+    font-size: 13px;
+  }
+  .him-dismiss:hover { background: #ffa8c6; }
+  .him-dismiss:active { transform: translate(1.5px, 1.5px); box-shadow: 1.5px 1.5px 0 #1a0a20; }
+  #bubble {
+    position: absolute;
+    min-width: 120px;
+    max-width: 260px;
+    background: #fff;
+    color: #1a0a20;
+    border: 3px solid #1a0a20;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1.3;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+    z-index: 25;
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 4px 4px 0 #1a0a20;
+  }
+  #bubble.show { opacity: 1; }
+  #bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    left: 30px;
+    border: 8px solid transparent;
+    border-top-color: #1a0a20;
+  }
+  #bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -9px;
+    left: 33px;
+    border: 5px solid transparent;
+    border-top-color: #fff;
+    z-index: 1;
+  }
+  .distraction {
+    position: absolute;
+    width: 170px;
+    min-height: 64px;
+    cursor: pointer;
+    background: #ffffff;
+    border: 3px solid #1a0a20;
+    color: #1a0a20;
+    animation: wobble 0.4s infinite alternate;
+    padding: 0;
+    line-height: 1.2;
+    box-shadow: 5px 5px 0 #1a0a20;
+    border-radius: 6px;
+    z-index: 20;
+    overflow: hidden;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  .distraction .notif-head {
+    display: flex;
+    align-items: center;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: white;
+    gap: 6px;
+  }
+  .distraction .notif-head .dot {
+    width: 8px;
+    height: 8px;
+    background: #ff3366;
+    border-radius: 50%;
+    animation: pulse-dot 0.6s infinite;
+  }
+  .distraction .notif-body {
+    padding: 6px 10px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1a0a20;
+    line-height: 1.3;
+  }
+  .distraction .notif-body .msg {
+    font-weight: 400;
+    color: #3a2a40;
+  }
+  @keyframes wobble {
+    from { transform: rotate(-2deg) translateY(0); }
+    to   { transform: rotate(2deg) translateY(-2px); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.6); opacity: 0.6; }
+  }
+  @keyframes flash {
+    0%,100% { box-shadow: 5px 5px 0 #1a0a20, 0 0 0 0 rgba(255,209,102,0); }
+    50% { box-shadow: 5px 5px 0 #1a0a20, 0 0 30px 6px rgba(255,209,102,0.7); }
+  }
+  .distraction.spicy {
+    animation: wobble 0.25s infinite alternate, flash 0.6s infinite;
+  }
+  #title-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(10,5,20,0.92);
+    text-align: center;
+    padding: 40px;
+  }
+  #title-screen h1 {
+    font-size: 44px;
+    color: #ff6b9d;
+    margin: 0 0 10px;
+    text-shadow: 4px 4px 0 #7a0e3d;
+    letter-spacing: 3px;
+  }
+  #title-screen h2 {
+    font-size: 18px;
+    color: #ffd166;
+    margin: 0 0 28px;
+    letter-spacing: 2px;
+  }
+  #title-screen p {
+    font-size: 13px;
+    max-width: 520px;
+    line-height: 1.7;
+    margin: 6px 0;
+  }
+  .hidden { display: none !important; }
+  #stats-bar {
+    position: absolute;
+    top: 52px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .bar {
+    flex: 1;
+    background: rgba(10,5,20,0.78);
+    border: 2px solid #ff6b9d;
+    height: 22px;
+    position: relative;
+    overflow: hidden;
+  }
+  .bar .fill { position: absolute; inset: 0; width: 50%; }
+  .bar .label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+    letter-spacing: 1px;
+  }
+  #focus-bar .fill { background: #6ad4c4; }
+  #fun-bar .fill { background: #ffd166; }
+  #boss-bar .fill { background: #ff6b9d; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="c" width="800" height="600"></canvas>
+
+  <div id="hud">
+    <div class="pill" id="day-pill">DAY 1</div>
+    <div class="pill" id="clock-pill">⏱ --:--</div>
+    <div class="pill" id="money-pill">$0 / $3000</div>
+    <div class="pill" id="scene-pill">BEDROOM</div>
+  </div>
+
+  <div id="stats-bar" class="hidden">
+    <div class="bar" id="focus-bar"><div class="fill"></div><div class="label">FOCUS</div></div>
+    <div class="bar" id="fun-bar"><div class="fill"></div><div class="label">FUN</div></div>
+    <div class="bar" id="boss-bar"><div class="fill"></div><div class="label">BOSS SUSPICION</div></div>
+  </div>
+
+  <div id="actions"></div>
+  <div id="dialogue"></div>
+  <div id="smack">SMACK!</div>
+  <div id="bubble"></div>
+  <div id="spiral-overlay">
+    <div class="dim"></div>
+    <div class="word"></div>
+    <div class="sub"></div>
+  </div>
+  <div id="him-overlay">
+    <div class="him-phone">
+      <div style="text-align:center;"><span class="him-badge">🔔 MESSAGE</span></div>
+      <div class="him-contact"><div class="avatar"></div><div>HIM 💔</div></div>
+      <div class="him-thread"></div>
+      <div class="him-time"></div>
+      <div class="him-react"></div>
+      <button class="him-dismiss">READ</button>
+    </div>
+  </div>
+
+  <div id="title-screen">
+    <h1>CORPO CAT</h1>
+    <h2>~ ZHENG vs. EVERYTHING ~</h2>
+    <p>Zheng is 32, gay, Chinese, stylish as hell, and drowning in a SaaS job he hates.</p>
+    <p>His Abyssinian cat Kinu vomits somewhere new every morning. That's the alarm clock.</p>
+    <p>His boss Sandal is a Swedish HR nightmare who Slacks at 11pm and signs off with "no rush :)".</p>
+    <p>The girlies are going to <b style="color:#ffd166">Malaga</b> in three weeks. Save <b style="color:#ffd166">$3000</b> or watch the stories from your cubicle.</p>
+    <p style="margin-top:24px; color:#6ad4c4;">Resist Grindr. Resist the group chat. Resist the urge to stab Sandal with a stapler.<br><span style="color:#ff6b9d">(You would never.)</span></p>
+    <button class="btn" style="margin-top:24px" onclick="startGame()">START DAY 1</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//   CORPO CAT — a pixel game about not wanting to work
+// ============================================================
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// -------- Web Audio SFX (synthesized, no files) --------
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+// Resume audio context on every user interaction (fixes Day 2+ silence)
+document.addEventListener('click', () => { ensureAudio(); }, true);
+document.addEventListener('keydown', () => { ensureAudio(); }, true);
+
+function sfx(type) {
+  const c = ensureAudio(); if (!c) return;
+  const now = c.currentTime;
+  if (type === 'spank') {
+    const buf = c.createBuffer(1, c.sampleRate * 0.15, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 2);
+    const s = c.createBufferSource(); s.buffer = buf;
+    const f = c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1800; f.Q.value=1.5;
+    const g = c.createGain(); g.gain.value = 0.45;
+    s.connect(f).connect(g).connect(c.destination); s.start(now);
+  } else if (type === 'slack') {
+    [440, 880].forEach((fr, i) => {
+      const o = c.createOscillator(); const g = c.createGain();
+      o.type='sine'; o.frequency.value=fr;
+      g.gain.setValueAtTime(0, now + i*0.06);
+      g.gain.linearRampToValueAtTime(0.18, now + i*0.06 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i*0.06 + 0.15);
+      o.connect(g).connect(c.destination);
+      o.start(now + i*0.06); o.stop(now + i*0.06 + 0.2);
+    });
+  } else if (type === 'retch') {
+    // Louder, wetter, longer. Three retch pulses + a splat.
+    for (let p = 0; p < 3; p++) {
+      const startAt = now + p * 0.18;
+      const dur = 0.15;
+      const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        const w = Math.sin(i/200 + p) * 0.6 + 0.4;
+        d[i] = (Math.random()*2-1) * w * (1 - i/d.length);
+      }
+      const s = c.createBufferSource(); s.buffer = buf;
+      const f = c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=500 - p * 80;
+      const g = c.createGain(); g.gain.value = 0.7;
+      s.connect(f).connect(g).connect(c.destination); s.start(startAt);
+      // pitch down oscillator for heaving tone
+      const o = c.createOscillator();
+      o.type='sawtooth'; o.frequency.setValueAtTime(180 - p*30, startAt);
+      o.frequency.exponentialRampToValueAtTime(60, startAt + dur);
+      const og = c.createGain();
+      og.gain.setValueAtTime(0.25, startAt);
+      og.gain.exponentialRampToValueAtTime(0.01, startAt + dur);
+      o.connect(og).connect(c.destination);
+      o.start(startAt); o.stop(startAt + dur);
+    }
+    // Splat at the end
+    const splatStart = now + 0.6;
+    const sbuf = c.createBuffer(1, c.sampleRate * 0.18, c.sampleRate);
+    const sd = sbuf.getChannelData(0);
+    for (let i = 0; i < sd.length; i++) sd[i] = (Math.random()*2-1) * (1 - i/sd.length);
+    const ss = c.createBufferSource(); ss.buffer = sbuf;
+    const sf = c.createBiquadFilter(); sf.type='bandpass'; sf.frequency.value=300; sf.Q.value=1;
+    const sg = c.createGain(); sg.gain.value = 0.6;
+    ss.connect(sf).connect(sg).connect(c.destination); ss.start(splatStart);
+  } else if (type === 'pop') {
+    const o = c.createOscillator(); const g = c.createGain();
+    o.type='square'; o.frequency.setValueAtTime(880, now);
+    o.frequency.exponentialRampToValueAtTime(220, now + 0.08);
+    g.gain.setValueAtTime(0.15, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    o.connect(g).connect(c.destination); o.start(now); o.stop(now + 0.12);
+  } else if (type === 'coin') {
+    [880, 1320].forEach((fr, i) => {
+      const o = c.createOscillator(); const g = c.createGain();
+      o.type='triangle'; o.frequency.value=fr;
+      g.gain.setValueAtTime(0, now + i*0.06);
+      g.gain.linearRampToValueAtTime(0.16, now + i*0.06 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i*0.06 + 0.18);
+      o.connect(g).connect(c.destination);
+      o.start(now + i*0.06); o.stop(now + i*0.06 + 0.2);
+    });
+  } else if (type === 'meow') {
+    const o = c.createOscillator(); const g = c.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(520, now);
+    o.frequency.exponentialRampToValueAtTime(680, now + 0.12);
+    o.frequency.exponentialRampToValueAtTime(420, now + 0.35);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    const f = c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1400;
+    o.connect(f).connect(g).connect(c.destination); o.start(now); o.stop(now + 0.45);
+  } else if (type === 'purr') {
+    // Low rumble with fluttering modulation — loops ~2.5s
+    const dur = 2.2;
+    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      const flutter = 0.45 + 0.55 * Math.sin(i / 80);
+      d[i] = (Math.random()*2-1) * flutter * 0.9;
+    }
+    const s = c.createBufferSource(); s.buffer = buf;
+    const f = c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=220;
+    const g = c.createGain(); g.gain.value = 0.35;
+    // low subharmonic
+    const o = c.createOscillator(); o.type='sine'; o.frequency.value=50;
+    const og = c.createGain(); og.gain.value = 0.12;
+    s.connect(f).connect(g).connect(c.destination);
+    o.connect(og).connect(c.destination);
+    s.start(now); o.start(now); o.stop(now + dur);
+  } else if (type === 'win') {
+    [523, 659, 784, 1047].forEach((fr, i) => {
+      const o = c.createOscillator(); const g = c.createGain();
+      o.type='triangle'; o.frequency.value=fr;
+      g.gain.setValueAtTime(0, now + i*0.12);
+      g.gain.linearRampToValueAtTime(0.2, now + i*0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i*0.12 + 0.3);
+      o.connect(g).connect(c.destination);
+      o.start(now + i*0.12); o.stop(now + i*0.12 + 0.35);
+    });
+  }
+}
+
+// -------- Speech bubble --------
+function showBubble(text, ms) {
+  const b = document.getElementById('bubble');
+  b.textContent = text;
+  const left = 280 + Math.random()*40;
+  const top  = 170 + Math.random()*20;
+  b.style.left = left + 'px';
+  b.style.top  = top + 'px';
+  b.classList.add('show');
+  clearTimeout(b._hideT);
+  b._hideT = setTimeout(() => b.classList.remove('show'), ms || 2200);
+}
+
+const W = 800, H = 600;
+const dialogue = document.getElementById('dialogue');
+const actions  = document.getElementById('actions');
+const statsBar = document.getElementById('stats-bar');
+const moneyPill = document.getElementById('money-pill');
+const dayPill   = document.getElementById('day-pill');
+const scenePill = document.getElementById('scene-pill');
+
+// ------- Game state -------
+const G = {
+  state: 'title',          // title | morning | choice | work | evening | win
+  day: 1,
+  money: 0,
+  goal: 3000,
+  workplace: null,         // 'home' | 'office'
+  focus: 50,
+  fun: 0,
+  boss: 0,
+  workTime: 0,
+  workDuration: 45,        // seconds per workday
+  vomitSpot: null,
+  vomitCleaned: false,
+  caughtToday: 0,
+  earnedToday: 0,
+  distractionTimer: 0,
+  bossTimer: 0,
+  lastTs: 0,
+  creativeCooldown: 0,
+  spankCooldown: 0,
+  spankCount: 0,
+  spankShake: 0,
+  mochiTimer: 0,
+  burnout: 0,
+  lowFunTime: 0,
+  highFocusTime: 0,
+  noFunSpiralTime: 0,
+  burnoutFiredToday: false,
+  lockupCooldown: 0,
+  himSpiralCooldown: 0,
+  spiralLock: 0,  // when > 0, FOCUS button is disabled
+  bedtime: null,
+  himStoryIndex: 0,
+  himPath: '',
+  himEnding: null,
+  brokeUpWithHim: false,
+  _himFiredToday: 0,
+  himPaused: false,
+  running: false,
+};
+
+const WEEKEND_EVERY = 3; // every 3rd day is a weekend (unused — week is Mon-Fri now)
+const DAYS_OF_WEEK = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+const TOTAL_WORKDAYS = 5;
+
+// ==========================================================
+// THE HIM STORY ARC — 10 messages across the week (2/day)
+// Zheng wants to meet. He's flaky. Zheng finally breaks.
+// UNSKIPPABLE. Pauses work clock.
+// ==========================================================
+// ==========================================================
+// 32-path branching story tree. 5 decision points = 2^5 = 32 endings.
+// Bit 0 = the soft / eager / doormat reply
+// Bit 1 = the sharp / cool / boundary reply
+// Each path builds up as a string like "01101".
+// After 5 decisions Zheng reaches one of 32 wildly different outcomes.
+// ==========================================================
+const HIM_TREE = {
+  // ---------- DAY 1 (Monday) ----------
+  '': {
+    day: 1, time: '09:22', his: 'hey cutie 👀',
+    opts: [
+      { label: '"hey :) miss u"', reply: 'hey :) miss u', react: 'sent a HEART adjacent sentence in 42 seconds. he\'s winning already.', fun: +30, focus: -22, boss: +10 },
+      { label: '"and you are?"', reply: 'and you are? 😐', react: 'pretended not to know. he\'ll remember me in a hotter version now. sly.', fun: +22, focus: -12, boss: +4 },
+    ],
+  },
+
+  // ---------- DAY 2 (Tuesday) ----------
+  '0': {
+    day: 2, time: '10:14', his: 'been thinking about u 🫣 what r u up to this week?',
+    opts: [
+      { label: '"free whenever you are ❤️"', reply: 'free whenever you are ❤️', react: 'completely available. he KNOWS i\'m completely available. what have i done.', fun: +28, focus: -24, boss: +12 },
+      { label: '"swamped, maybe sat?"', reply: 'kinda swamped, maybe sat?', react: 'invented fake plans i do not have. mild power move.', fun: +18, focus: -14, boss: +8 },
+    ],
+  },
+  '1': {
+    day: 2, time: '11:47', his: 'ok i deserved that lol. let me take u to dinner?',
+    opts: [
+      { label: '"go on…"', reply: 'go on…', react: 'the aloofness is WORKING. look at me being mysterious.', fun: +26, focus: -14, boss: +8 },
+      { label: '"only if it\'s expensive"', reply: 'only if it\'s expensive 😈', react: 'full diva. he sent a laugh reaction and a reservation screenshot in the same message.', fun: +30, focus: -20, boss: +10 },
+    ],
+  },
+
+  // ---------- DAY 3 (Wednesday) ----------
+  '00': {
+    day: 3, time: '08:41', his: 'so i MIGHT be free sun? or maybe mon? idk 🥹',
+    opts: [
+      { label: '"whatever works for you ❤️"', reply: 'whatever works for you ❤️', react: 'i melt to his schedule. i have no shape left.', fun: -8, focus: -28, boss: +14 },
+      { label: '"just text me when you know"', reply: 'just text me when you know', react: 'curt. he\'ll either lock it in or ghost. 50/50.', fun: +4, focus: -14, boss: +8 },
+    ],
+  },
+  '01': {
+    day: 3, time: '15:22', his: 'sat at 8? cool place, trust me',
+    opts: [
+      { label: '"perfect 🖤"', reply: 'perfect 🖤', react: 'LOCKED IN. with a black heart. i am LOCKED IN.', fun: +32, focus: -20, boss: +10 },
+      { label: '"7 or not at all"', reply: '7 or not at all', react: 'a deadline. first time. he sent "ok 7 it is 😂" instantly. powerful.', fun: +26, focus: -14, boss: +6 },
+    ],
+  },
+  '10': {
+    day: 3, time: '12:18', his: 'so for real tho — sat, dinner, my treat?',
+    opts: [
+      { label: '"sure. surprise me."', reply: 'sure. surprise me.', react: 'handed him the wheel. elegantly.', fun: +28, focus: -16, boss: +8 },
+      { label: '"i\'ll think about it"', reply: 'i\'ll think about it', react: 'torturous. he double-texted 12 min later: "!!!". i\'m a queen.', fun: +30, focus: -18, boss: +8 },
+    ],
+  },
+  '11': {
+    day: 3, time: '17:03', his: 'ok u\'re scaring me a lil (in a good way). reservation at 8, sat, dress nice.',
+    opts: [
+      { label: '"see you there 🖤"', reply: 'see you there 🖤', react: 'he BOOKED it. he BOOKED A RESERVATION. the roles are reversed.', fun: +35, focus: -14, boss: +8 },
+      { label: '"make it interesting"', reply: 'make it interesting', react: 'he replied "oh i will 🎩" — zheng googled what that means for 22 min.', fun: +30, focus: -20, boss: +10 },
+    ],
+  },
+
+  // ---------- DAY 4 (Thursday) ----------
+  '000': {
+    day: 4, time: '14:06', his: 'sooo about this weekend… friend\'s bachelorette 😭 can we do next wk?',
+    opts: [
+      { label: '"no worries!! whenever!!"', reply: 'no worries!! whenever!! have fun!! ❤️', react: 'tripled the exclamation points. sent a heart for HIS inconvenience. doormat aria.', fun: -18, focus: -30, boss: +16 },
+      { label: '"3rd reschedule. what are we doing"', reply: '3rd reschedule. what are we actually doing here', react: 'first real question asked aloud. he went quiet for 40 min.', fun: -6, focus: -18, boss: +12 },
+    ],
+  },
+  '001': {
+    day: 4, time: '19:24', his: 'ok ok ok sat is ON. dress code: casual but hot.',
+    opts: [
+      { label: '"been waiting 🫦"', reply: 'been waiting 🫦', react: 'the sexting has begun. i am typing like a 22-year-old again.', fun: +28, focus: -22, boss: +14 },
+      { label: '"we\'ll see if you show"', reply: 'we\'ll see if you show', react: 'a CHECK. a doubt seeded. he\'s going to show now. or he\'ll ghost. hard to say.', fun: +10, focus: -14, boss: +8 },
+    ],
+  },
+  '010': {
+    day: 4, time: '10:02', his: 'hey wait — does sat still work or are u mad 🥺',
+    opts: [
+      { label: '"not mad, just tired"', reply: 'not mad, just tired', react: 'classic. he sent a sad gif. the gif did not fix anything.', fun: -4, focus: -18, boss: +10 },
+      { label: '"we don\'t need to do this"', reply: 'honestly? we don\'t need to do this', react: 'the off-ramp has appeared. he went silent for 2h.', fun: +12, focus: -12, boss: +6 },
+    ],
+  },
+  '011': {
+    day: 4, time: '13:44', his: 'can i ask u something? are u seeing other ppl?',
+    opts: [
+      { label: '"no. are you?"', reply: 'no. are you?', react: 'ball\'s in his court. he went "not really" — NOT REALLY? NOT REALLY????', fun: -2, focus: -22, boss: +12 },
+      { label: '"that\'s my business"', reply: 'that\'s my business', react: 'a wall. a real wall. he replied "fair". one word. FAIR.', fun: +24, focus: -16, boss: +8 },
+    ],
+  },
+  '100': {
+    day: 4, time: '15:31', his: 'ok i\'ll be real. friend isn\'t in town. wanna just come over?',
+    opts: [
+      { label: '"address?"', reply: 'address?', react: 'sent it. immediate. no thoughts. animals do this.', fun: +32, focus: -28, boss: +16 },
+      { label: '"take me out or nothing"', reply: 'take me out or nothing', react: 'stood my ground WITH style. he replied "ok fine princess" — worked.', fun: +22, focus: -14, boss: +8 },
+    ],
+  },
+  '101': {
+    day: 4, time: '11:20', his: 'btw i told my mate ur joining us. she\'s excited 😅',
+    opts: [
+      { label: '"cute, what\'s her name?"', reply: 'cute, what\'s her name?', react: 'polite. accommodating. once again somebody else\'s plus-one on my own date.', fun: -8, focus: -24, boss: +12 },
+      { label: '"nope. just us or nothing"', reply: 'nope. just us or nothing', react: 'held the line. he replied "ok! just us ❤️" — it WORKS when you speak up.', fun: +26, focus: -10, boss: +6 },
+    ],
+  },
+  '110': {
+    day: 4, time: '09:51', his: 'hmmm might need to push sat. important meeting ran long 🙈',
+    opts: [
+      { label: '"totally, np! gimme a new date"', reply: 'totally, np! gimme a new date', react: 'collapsed on first contact. the sharpness on monday was a costume.', fun: -14, focus: -24, boss: +14 },
+      { label: '"then let\'s just not"', reply: 'then let\'s just not do this actually', react: 'cancelled it MYSELF. first time in my life. i feel weightless.', fun: +40, focus: +14, boss: -8 },
+    ],
+  },
+  '111': {
+    day: 4, time: '12:02', his: 'u\'re scary i love it. reservation still on. i\'ll pick u up.',
+    opts: [
+      { label: '"pick me up? bold."', reply: 'pick me up? bold.', react: 'he took it as a yes. i think it was a yes.', fun: +30, focus: -16, boss: +10 },
+      { label: '"i\'ll meet u there"', reply: 'i\'ll meet u there', react: 'kept an escape route. a HEALTHY boundary. who am i.', fun: +26, focus: -10, boss: +6 },
+    ],
+  },
+
+  // ---------- DAY 5 (Friday) — 16 paths, each with 2 endings = 32 total ----------
+  '0000': {
+    day: 5, time: '13:08', his: 'u around later? 🥺 i miss ur energy',
+    opts: [
+      { label: '"always ❤️"', reply: 'always ❤️', react: 'I SAID ALWAYS. to a man who has cancelled me 4x. i will be alone in my 70s. just me and kinu.', fun: -30, focus: -36, boss: +20, end: 'marooned' },
+      { label: '"i need a break"', reply: 'i need a break from this', react: 'first boundary in a 4-month tailspin. not a breakup. a pause. my therapist will CLAP.', fun: +30, focus: +12, boss: -4, end: 'pause' },
+    ],
+  },
+  '0001': {
+    day: 5, time: '18:40', his: 'ok sat is def happening. wear the shirt i like 😈',
+    opts: [
+      { label: '"yes sir"', reply: 'yes sir', react: 'i\'m dressing for him again. i\'m cooking for him next. i AM the bachelorette.', fun: +12, focus: -30, boss: +16, end: 'yes-sir' },
+      { label: '"i\'ll wear what i want"', reply: 'i\'ll wear what i want, thanks', react: 'reclaimed my wardrobe. he replied "ok goddess 🔥" — correction: GODDESS.', fun: +32, focus: -6, boss: 0, end: 'goddess' },
+    ],
+  },
+  '0010': {
+    day: 5, time: '10:17', his: 'lol r u really pulling a silent treatment rn',
+    opts: [
+      { label: '"sorry sorry! just busy"', reply: 'sorry sorry! just busy, call u tonight ❤️', react: 'apologized to HIM for not being available for HIM. we\'re in the deep end.', fun: -20, focus: -30, boss: +16, end: 'silent-undone' },
+      { label: '"i\'m not pulling anything"', reply: 'i\'m not pulling anything. take care ✌️', react: 'the exit that isn\'t a breakup. the cool-girl walk-out. he\'ll text sunday night. i won\'t reply.', fun: +34, focus: +16, boss: -6, end: 'peace-out' },
+    ],
+  },
+  '0011': {
+    day: 5, time: '16:44', his: 'ok tn? 9? my place? no friend this time',
+    opts: [
+      { label: '"send address"', reply: 'send address', react: 'THIS IS WHAT I WANTED. also — is it. IS IT what i wanted??', fun: +28, focus: -34, boss: +18, end: 'booty-call' },
+      { label: '"no thank you"', reply: 'no thank you. be well.', react: '"no thank you." polite. BRUTAL. he didn\'t reply.', fun: +45, focus: +18, boss: -8, end: 'polite-exit' },
+    ],
+  },
+  '0100': {
+    day: 5, time: '14:55', his: 'still mad? i was hoping we could just start over',
+    opts: [
+      { label: '"sure, fresh start ❤️"', reply: 'sure, fresh start ❤️', react: 'it\'s the same start. i\'m laminating the pattern.', fun: -18, focus: -32, boss: +18, end: 'reset-loop' },
+      { label: '"we start over w/o me"', reply: 'we start over without me. take care.', react: 'the cleanest line i\'ve ever written. i saved it in Notes.', fun: +48, focus: +22, boss: -10, end: 'clean-line' },
+    ],
+  },
+  '0101': {
+    day: 5, time: '11:11', his: 'so are we good? tmr 7 still?',
+    opts: [
+      { label: '"7. don\'t be late"', reply: '7. don\'t be late.', react: 'set a time with teeth. he replied "yes ma\'am" and i BLOOMED.', fun: +32, focus: -10, boss: +4, end: 'ma-am' },
+      { label: '"changed my mind"', reply: 'changed my mind. good luck out there.', react: 'at the altar of dinner, i walked. felt like a movie. felt like healing.', fun: +46, focus: +20, boss: -8, end: 'walked' },
+    ],
+  },
+  '0110': {
+    day: 5, time: '09:33', his: 'i kno i\'ve been inconsistent. can we talk tnight?',
+    opts: [
+      { label: '"yes. tell me everything"', reply: 'yes. tell me everything', react: 'giving him a stage again. front row. i bought the tickets. i MADE the tickets.', fun: -10, focus: -28, boss: +14, end: 'therapy-session' },
+      { label: '"i\'m good. you go talk to her"', reply: 'i\'m good. you go have that talk with her.', react: 'threw the "friend" back at him. he went silent. i put on lipstick.', fun: +42, focus: +18, boss: -10, end: 'lipstick' },
+    ],
+  },
+  '0111': {
+    day: 5, time: '12:48', his: 'my business too btw. i\'m not seeing anyone either.',
+    opts: [
+      { label: '"ok. let\'s try this"', reply: 'ok. let\'s try this for real', react: 'tentatively optimistic. it\'ll work this time. (it will not work this time.)', fun: +12, focus: -24, boss: +12, end: 'trying-again' },
+      { label: '"ok. still a no from me."', reply: 'ok. still a no from me.', react: 'even his honesty was too late. the no stayed no. i grew 2 inches.', fun: +46, focus: +22, boss: -10, end: 'grew-taller' },
+    ],
+  },
+  '1000': {
+    day: 5, time: '21:14', his: 'u ghosting me? wow ok 😂😂',
+    opts: [
+      { label: '"nono not ghosting! hi!"', reply: 'nono not ghosting!! hi!! i\'m sorry 🥺', react: 'three hi\'s and a "sorry" because HE went quiet first. we\'re beyond help.', fun: -26, focus: -34, boss: +20, end: 'undone-by-emoji' },
+      { label: '*leaves on read*', reply: '(read. no reply.)', react: 'watched the read receipt. put the phone face down. had a cookie.', fun: +50, focus: +22, boss: -12, end: 'read-no-reply' },
+    ],
+  },
+  '1001': {
+    day: 5, time: '17:22', his: 'alright sat. i\'ll behave. promise 🤝',
+    opts: [
+      { label: '"good boy."', reply: 'good boy.', react: 'flipped the dynamic. he SENT A SCREENSHOT of the message to himself.', fun: +38, focus: -18, boss: +10, end: 'top-energy' },
+      { label: '"don\'t promise. just do it."', reply: 'don\'t promise. just do it.', react: 'cold. precise. he took a deep breath you could hear through the phone.', fun: +40, focus: -8, boss: +4, end: 'nike-breakup' },
+    ],
+  },
+  '1010': {
+    day: 5, time: '10:40', his: 'so did i lose u or nah',
+    opts: [
+      { label: '"never, babe"', reply: 'never, babe', react: 'i\'m a hostage in my own text thread.', fun: -14, focus: -30, boss: +16, end: 'hostage' },
+      { label: '"you did, actually"', reply: 'you did, actually. best of luck.', react: '"best of luck" — PhD in closure. he replied "brutal ❤️" — i didn\'t open it.', fun: +48, focus: +24, boss: -12, end: 'phd-closure' },
+    ],
+  },
+  '1011': {
+    day: 5, time: '19:02', his: 'i like u standing up to me. weirdly hot.',
+    opts: [
+      { label: '"i know"', reply: 'i know', react: 'two words. immaculate. he went "…fuck". i saved the screenshot.', fun: +44, focus: -8, boss: +4, end: 'two-words' },
+      { label: '"this ends now."', reply: 'this ends now. take care of yourself.', react: 'peaked at "standing up to me" and walked. parted while hot. RARE.', fun: +52, focus: +26, boss: -14, end: 'parted-hot' },
+    ],
+  },
+  '1100': {
+    day: 5, time: '08:14', his: 'last chance??? please???',
+    opts: [
+      { label: '"fine. LAST chance"', reply: 'fine. LAST chance.', react: 'gave him a Last Chance in caps. he blew it by tuesday.', fun: -12, focus: -28, boss: +14, end: 'last-chance-loop' },
+      { label: '"you used it already"', reply: 'you used it already. three times.', react: 'counted the chances aloud. he sent four heart-break emojis. i laughed.', fun: +50, focus: +22, boss: -12, end: 'counted-them' },
+    ],
+  },
+  '1101': {
+    day: 5, time: '13:55', his: 'not interested in anyone else btw. just u.',
+    opts: [
+      { label: '"prove it."', reply: 'prove it.', react: 'a dare. he\'ll fumble it. but for now — i\'m a movie character.', fun: +36, focus: -14, boss: +8, end: 'movie-character' },
+      { label: '"prove it to someone else."', reply: 'prove it to someone else.', react: 'SENT. iconic. i am going to get that printed on a tote bag.', fun: +54, focus: +26, boss: -14, end: 'tote-bag' },
+    ],
+  },
+  '1110': {
+    day: 5, time: '16:28', his: 'ok if i just… came by tonight? just to see u?',
+    opts: [
+      { label: '"okay. just tonight."', reply: 'okay. just tonight.', react: 'we both know it won\'t be just tonight. i\'ve already stripped the bed.', fun: +22, focus: -30, boss: +16, end: 'just-tonight' },
+      { label: '"no. goodnight."', reply: 'no. goodnight.', react: '"no. goodnight." single period. he replied nothing. won the game.', fun: +48, focus: +22, boss: -12, end: 'goodnight' },
+    ],
+  },
+  '1111': {
+    day: 5, time: '20:00', his: 'i\'m outside. can i come up?',
+    opts: [
+      { label: '"buzz 4B"', reply: 'buzz 4B', react: 'buzzed him in. kinu judged me from the armchair. she was right to.', fun: +20, focus: -32, boss: +18, end: 'buzzed-up' },
+      { label: '"go home."', reply: 'go home.', react: '"go home." i watched him walk away through the window. i cried but it was the good kind.', fun: +58, focus: +28, boss: -16, end: 'walked-away' },
+    ],
+  },
+};
+
+// The 32 unique endings — played after day 5 decision.
+const HIM_ENDINGS = {
+  'marooned':        { breakup: false, title: 'MAROONED', text: 'You\'re still on the raft. He\'s the ocean. You call this "patient". You mean "marooned".' },
+  'pause':           { breakup: true,  title: 'PAUSE.',   text: 'A pause is not a breakup. But your shoulders dropped 2 inches. That counts.' },
+  'yes-sir':         { breakup: false, title: 'YES SIR.', text: 'You went to dinner in his shirt. You came home with half a meal and a whole new smallness.' },
+  'goddess':         { breakup: false, title: 'GODDESS',  text: 'You went but on your terms. He peaked at appetizer. You\'re still thinking about whether to see him again. Progress.' },
+  'silent-undone':   { breakup: false, title: 'UNDONE',   text: 'You apologized for his silence. He accepted. The rest of the year follows this shape.' },
+  'peace-out':       { breakup: true,  title: 'PEACE ✌️',  text: 'Not a breakup — a walk-out. He tried Sunday. You didn\'t open it. You never will.' },
+  'booty-call':      { breakup: false, title: 'BOOTY CALL', text: 'You went. He was warm. You left at 3am in yesterday\'s clothes. The L train was empty. So were you.' },
+  'polite-exit':     { breakup: true,  title: 'POLITE EXIT', text: 'You said no thank you. To a hot man. At 4pm on a Friday. Kinu purred in your lap for an hour.' },
+  'reset-loop':      { breakup: false, title: 'RESET LOOP', text: 'You reset. Again. Week one of the new era starts Monday. Probably. Unless he cancels.' },
+  'clean-line':      { breakup: true,  title: 'CLEAN LINE', text: '"We start over without me." You saved it in Notes as a reminder that you, too, can be devastating.' },
+  'ma-am':           { breakup: false, title: 'MA\'AM',   text: 'He called you ma\'am. You showed up at 7. He showed up at 7:22. Different kinds of power.' },
+  'walked':          { breakup: true,  title: 'WALKED.',  text: 'You walked from the table before sitting down. It was the most cinematic hour of your year.' },
+  'therapy-session': { breakup: false, title: 'THERAPY',  text: 'You gave him a two-hour unpaid therapy session on FaceTime. You fell asleep. He was still talking.' },
+  'lipstick':        { breakup: true,  title: 'LIPSTICK', text: 'You put on lipstick. Went out with Anna. Got asked for your number three times. You gave it once.' },
+  'trying-again':    { breakup: false, title: 'TRYING AGAIN', text: 'Tentative optimism. Week 2 of the cycle begins. You both know the shape of the spiral.' },
+  'grew-taller':     { breakup: true,  title: 'TWO INCHES', text: 'You grew two inches today. Metaphysically. Susan said your posture was "different". She was right.' },
+  'undone-by-emoji': { breakup: false, title: 'UNDONE BY EMOJI', text: 'He sent 😂😂 and you apologized. That\'s the whole relationship, in one exchange.' },
+  'read-no-reply':   { breakup: true,  title: 'READ. NO REPLY.', text: 'You left him on read. Put the phone face down. Ate a cookie. Time: 9:14pm. Location: victorious.' },
+  'top-energy':      { breakup: false, title: 'TOP ENERGY', text: 'You said "good boy". He short-circuited. You rode this dynamic for a month before he ghosted again.' },
+  'nike-breakup':    { breakup: true,  title: 'JUST DO IT', text: '"Don\'t promise. Just do it." He didn\'t. You noticed. You never replied to the apology.' },
+  'hostage':         { breakup: false, title: 'HOSTAGE',  text: 'You said "never, babe". You meant it. You\'re still meaning it. This is the ending where you\'re still here.' },
+  'phd-closure':     { breakup: true,  title: 'PhD CLOSURE', text: '"You did, actually. Best of luck." — a sentence so clean it belongs in a museum of exits.' },
+  'two-words':       { breakup: false, title: 'I KNOW',   text: 'You said "i know" and he replied "fuck". You saved the screenshot. You\'re 45% in love. Still.' },
+  'parted-hot':      { breakup: true,  title: 'PARTED HOT', text: 'You ended it at peak attraction. Rarer than a solar eclipse. Kinu made you a tiny medal.' },
+  'last-chance-loop':{ breakup: false, title: 'LAST CHANCE', text: 'You gave him a Last Chance in caps. It was not, in fact, the last one. There will be more.' },
+  'counted-them':    { breakup: true,  title: 'COUNTED', text: 'You COUNTED the chances aloud. The audit was devastating. He sent four crying emojis. You laughed.' },
+  'movie-character': { breakup: false, title: 'MOVIE CHARACTER', text: '"Prove it." You are now the main character in a drama you wrote and are still starring in.' },
+  'tote-bag':        { breakup: true,  title: 'TOTE BAG',  text: '"Prove it to someone else" — getting that embroidered on a tote in Malaga. You will wear it daily.' },
+  'just-tonight':    { breakup: false, title: 'JUST TONIGHT', text: 'Spoiler: not just tonight. He was there three times this week. You are still saying "last time".' },
+  'goodnight':       { breakup: true,  title: 'GOODNIGHT.', text: '"No. Goodnight." — one period. He didn\'t reply. You slept eight hours. Kinu didn\'t even vomit.' },
+  'buzzed-up':       { breakup: false, title: 'BUZZED UP', text: 'You buzzed him in. Kinu was disappointed. She left the room. You noticed but did not leave yours.' },
+  'walked-away':     { breakup: true,  title: 'WALKED AWAY', text: 'You said "go home". Watched him leave from the window. Cried. The good kind. Kinu purred on your chest.' },
+};
+
+// Legacy — kept for compat (unused by new tree flow)
+const HIM_STORY = [
+  // --- MONDAY: he resurfaces ---
+  { day: 1, slot: 'AM', time: '09:22', text: 'hey cutie 👀', options: [
+    { label: '"hey :)"', reply: 'hey :)',
+      react: 'HE TEXTED. <b>HE TEXTED.</b><br>i replied in 42 seconds. i should have waited. i did not wait.',
+      fun: +30, focus: -22, boss: +10 },
+    { label: '"lol hi"', reply: 'lol hi',
+      react: 'played it cool. he read it 3 min ago. no reply yet.<br>was "lol hi" too much? too little? what have i done.',
+      fun: +22, focus: -16, boss: +6 },
+  ]},
+  { day: 1, slot: 'PM', time: '14:08', text: 'are u around this weekend? 🫣', options: [
+    { label: '"yea, what did u have in mind?"', reply: 'yea, what did u have in mind?',
+      react: 'eager. too eager. sent in 28 sec. i am a clown. a visible clown.',
+      fun: +26, focus: -20, boss: +12 },
+    { label: '"maybe, what\'s up?"', reply: 'maybe, what\'s up?',
+      react: 'measured. waited 14 min. exerted casual.<br>he saw it 3 min ago. nothing yet.',
+      fun: +18, focus: -14, boss: +8 },
+  ]},
+
+  // --- TUESDAY: momentum ---
+  { day: 2, slot: 'AM', time: '10:14', text: 'was thinking about you last night', options: [
+    { label: '"🥺 me too"', reply: '🥺 me too',
+      react: 'he was THINKING. ABOUT. ME.<br>it\'s probably fine he hasn\'t mentioned what he was thinking about.',
+      fun: +28, focus: -20, boss: +10 },
+    { label: '"oh yeah? what about"', reply: 'oh yeah? what about',
+      react: 'making him work for it. first time. proud.<br>he left me on read for 4 hours. i am less proud now.',
+      fun: +16, focus: -18, boss: +8 },
+  ]},
+  { day: 2, slot: 'PM', time: '15:47', text: 'maybe dinner saturday? 🍷 i know a place', options: [
+    { label: '"sounds amazing ❤️"', reply: 'sounds amazing ❤️',
+      react: 'DINNER. SATURDAY. ❤️ with a heart. FROM ME. full send. full regret.',
+      fun: +34, focus: -24, boss: +14 },
+    { label: '"sure, what time?"', reply: 'sure, what time?',
+      react: 'kept it light. did not send a heart. won a small internal war.',
+      fun: +22, focus: -18, boss: +10 },
+  ]},
+
+  // --- WEDNESDAY: confirmed + first crack ---
+  { day: 3, slot: 'AM', time: '09:56', text: 'so sat at 8? got a spot in mind', options: [
+    { label: '"perfect"', reply: 'perfect',
+      react: 'locked in. i own a nice shirt. somewhere. I OWN A NICE SHIRT.',
+      fun: +28, focus: -18, boss: +8 },
+    { label: '"can we do 7?"', reply: 'can we do 7?',
+      react: 'negotiated. a boundary. A SMALL ONE.<br>he said "lol sure" and zheng took it as a kiss.',
+      fun: +22, focus: -14, boss: +6 },
+  ]},
+  { day: 3, slot: 'PM', time: '16:22', text: 'actually mind if i bring a friend? she\'s cool, you\'ll love her', options: [
+    { label: '"of course! love meeting new people"', reply: 'of course! love meeting new people',
+      react: 'said yes. to a third wheel. on his own date.<br>who am i. WHO AM I.',
+      fun: -6, focus: -22, boss: +12 },
+    { label: '"actually, could we just be us?"', reply: 'actually, could we just be us?',
+      react: 'i pushed back. AUDIBLY. sent it and put the phone face down.<br>he replied "ofc ❤️ my bad". 4 min. he\'s soft now. dangerous.',
+      fun: +14, focus: -12, boss: +8 },
+    { label: '"know what — let\'s cancel."', reply: 'know what, let\'s just cancel the whole thing. take care of yourself.',
+      react: '<span style="color:#6ad4c4;font-weight:bold;">sent. read. no reply.</span><br>2 hours in, he DM\'d an old meme. zheng did not respond.<br>he is free. she is free. zheng is free.',
+      fun: +55, focus: +25, boss: -15, breakup: true },
+  ]},
+
+  // --- THURSDAY: flake begins ---
+  { day: 4, slot: 'AM', time: '11:03', text: 'omg so sorry, might have to reschedule?? 😭', options: [
+    { label: '"no worries! whenever works"', reply: 'no worries! whenever works ❤️',
+      react: 'doormat behavior. award-winning.<br>sent a heart to apologize for his inconvenience. I sent a HEART.',
+      fun: -14, focus: -26, boss: +14 },
+    { label: '"we literally had plans"', reply: 'we literally had plans though',
+      react: 'first sharp thing zheng has said in 18 months.<br>he replied "omg ik 😭😭😭 i\'ll make it up!" — did not say how.',
+      fun: +4, focus: -16, boss: +10 },
+    { label: '"don\'t bother. lose my number."', reply: 'don\'t bother. lose my number.',
+      react: '<span style="color:#6ad4c4;font-weight:bold;">i sent it. i SENT it. i did not delete it.</span><br>he replied "whoa??" zheng muted the chat.',
+      fun: +50, focus: +22, boss: -12, breakup: true },
+  ]},
+  { day: 4, slot: 'PM', time: '17:41', text: 'work thing came up babe. sunday brunch maybe? 🥺', options: [
+    { label: '"sunday works!"', reply: 'sunday works! no stress',
+      react: 'NO STRESS??? the stress is visible from space.<br>he hearted it. he hearted it and went back to whatever he was doing.',
+      fun: -18, focus: -28, boss: +14 },
+    { label: '"this keeps happening"', reply: 'this keeps happening and it\'s getting weird',
+      react: 'finally said it. finally SAID IT.<br>he replied "ik ik babe!! will make it right 🙈" — eight minutes later: nothing.',
+      fun: +6, focus: -14, boss: +10 },
+    { label: '"i\'m done."', reply: 'i\'m done.',
+      react: '<span style="color:#6ad4c4;font-weight:bold;">two words. SENT.</span><br>he typed. stopped typing. typed again. stopped.<br>zheng blocks him and cries happy for 6 minutes.',
+      fun: +55, focus: +28, boss: -15, breakup: true },
+  ]},
+
+  // --- FRIDAY: full flake → forced breakup ---
+  { day: 5, slot: 'AM', time: '10:31', text: 'actually sunday is tricky too. let\'s just play it by ear ✨', options: [
+    { label: '"ok ❤️"', reply: 'ok ❤️',
+      react: '"ok ❤️" to "play it by ear" on the 4th reschedule.<br>something in me has gone offline. i can hear the ocean.',
+      fun: -26, focus: -32, boss: +18 },
+    { label: '"please stop doing this"', reply: 'please stop doing this',
+      react: 'sent it. he replied "doing what ?? 😂" — do NOT engage. do not engage. (zheng is engaging.)',
+      fun: -8, focus: -18, boss: +12 },
+    { label: '"goodbye."', reply: 'goodbye.',
+      react: '<span style="color:#6ad4c4;font-weight:bold;">one word. full stop. sent.</span><br>he replied "???" zheng did not reply. zheng never replied again.',
+      fun: +55, focus: +28, boss: -15, breakup: true },
+  ]},
+
+  // FINAL — if player never picked breakup, this is the forced breakup
+  { day: 5, slot: 'PM', time: '16:04', text: '(he sent another "u around later?")', options: [
+    { label: '"i don\'t want to do this anymore."', reply: 'i don\'t want to do this anymore. please don\'t text me again.',
+      react: 'sent. read. no reply.<br>he is not going to text back. and that is the point.<br><span style="color:#6ad4c4;font-weight:bold;">you did something brave today.</span>',
+      fun: +50, focus: +25, boss: -10, breakup: true, final: true },
+  ]},
+];
+
+function showHimNode(pathKey) {
+  const node = HIM_TREE[pathKey];
+  if (!node) { G.himPaused = false; return; }
+  const ov = document.getElementById('him-overlay');
+  const thread = ov.querySelector('.him-thread');
+  thread.innerHTML = '';
+  const b = document.createElement('div');
+  b.className = 'him-msg';
+  b.textContent = node.his;
+  thread.appendChild(b);
+  ov.querySelector('.him-time').textContent = node.time + ' · ' + DAYS_OF_WEEK[node.day-1];
+  ov.querySelector('.him-react').innerHTML = '';
+
+  // Build options
+  const oldBtns = ov.querySelector('.him-options');
+  if (oldBtns) oldBtns.remove();
+  const dismissBtn = ov.querySelector('.him-dismiss');
+  dismissBtn.style.display = 'none';
+
+  const optsWrap = document.createElement('div');
+  optsWrap.className = 'him-options';
+  optsWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:12px;';
+  node.opts.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'him-dismiss';
+    btn.textContent = opt.label;
+    btn.style.cssText = 'margin:0;width:100%;font-size:12px;padding:9px 10px;';
+    // If this option's ending is a breakup, style it softly
+    if (opt.end && HIM_ENDINGS[opt.end] && HIM_ENDINGS[opt.end].breakup) {
+      btn.style.background = '#6ad4c4';
+      btn.style.color = '#0a1a20';
+      btn.style.boxShadow = '3px 3px 0 #1e4e48';
+    }
+    btn.onclick = () => {
+      optsWrap.remove();
+      const r = document.createElement('div');
+      r.className = 'him-msg me';
+      r.textContent = opt.reply;
+      thread.appendChild(r);
+      ov.querySelector('.him-react').innerHTML = opt.react;
+      dismissBtn.style.display = 'block';
+      dismissBtn.textContent = opt.end ? (HIM_ENDINGS[opt.end].breakup ? 'BREATHE' : 'GODSPEED') : 'CONTINUE';
+      if (opt.end && HIM_ENDINGS[opt.end].breakup) setTimeout(() => sfx('win'), 400);
+      dismissBtn.onclick = () => {
+        ov.classList.remove('show');
+        G.fun = Math.max(0, Math.min(100, G.fun + (opt.fun || 0)));
+        G.focus = Math.max(0, Math.min(100, G.focus + (opt.focus || 0)));
+        G.boss = Math.max(0, Math.min(100, G.boss + (opt.boss || 0)));
+        G.himPaused = false;
+        setDialogue('ZHENG', opt.react);
+        updateFocusBtnLock();
+        // Advance the path
+        G.himPath = (G.himPath || '') + String(idx);
+        // If we reached an ending node, apply the ending
+        if (opt.end) {
+          const ending = HIM_ENDINGS[opt.end];
+          G.himEnding = opt.end;
+          G.brokeUpWithHim = ending.breakup;
+          setTimeout(() => {
+            setDialogue(
+              (ending.breakup ? '<span style="color:#6ad4c4;">ENDING:</span> ' : '<span style="color:#ff6b9d;">ENDING:</span> ') + ending.title,
+              '<i>' + ending.text + '</i>'
+            );
+          }, 1800);
+        }
+      };
+    };
+    optsWrap.appendChild(btn);
+  });
+  ov.querySelector('.him-phone').appendChild(optsWrap);
+
+  ov.classList.add('show');
+  sfx('slack');
+  setTimeout(() => sfx('pop'), 220);
+}
+
+function fireHimIfDue() {
+  if (G.himPaused) return;
+  if (G.brokeUpWithHim) return;
+  if (G.himEnding) return;
+  // Path length = number of decisions made. Day 1 = decision 0, Day 5 = decision 4.
+  const path = G.himPath || '';
+  const nextDay = path.length + 1;
+  if (nextDay > 5) return;
+  if (nextDay !== G.day) return;
+  // Fire when we hit the early threshold in the workday
+  if (G.workTime < 6) return;
+  // Only one firing per day — guard
+  if (G._himFiredToday === G.day) return;
+  G._himFiredToday = G.day;
+  G.himPaused = true;
+  showHimNode(path);
+}
+
+let G_him = null;
+function showHimMessage(msg, onDismiss) {
+  const ov = document.getElementById('him-overlay');
+  const thread = ov.querySelector('.him-thread');
+  thread.innerHTML = '';
+  const b = document.createElement('div');
+  b.className = 'him-msg' + (msg.fromMe ? ' me' : '');
+  b.textContent = msg.text;
+  thread.appendChild(b);
+  ov.querySelector('.him-time').textContent = msg.time + ' · ' + DAYS_OF_WEEK[msg.day-1];
+  ov.querySelector('.him-react').innerHTML = msg.react;
+  const btn = ov.querySelector('.him-dismiss');
+  btn.textContent = msg.final ? 'BREATHE' : (msg.fromMe ? 'SENT' : 'READ');
+  const close = () => {
+    ov.classList.remove('show');
+    btn.removeEventListener('click', close);
+    if (onDismiss) onDismiss();
+  };
+  btn.addEventListener('click', close);
+  ov.classList.add('show');
+  // dramatic sounds
+  sfx('slack');
+  setTimeout(() => sfx('pop'), 220);
+  if (msg.final) {
+    setTimeout(() => sfx('coin'), 600);
+  }
+}
+
+function fireHimIfDue() {
+  if (G.himPaused) return;
+  // Find next message matching current day + time slot
+  const nextIdx = G.himStoryIndex || 0;
+  if (nextIdx >= HIM_STORY.length) return;
+  const next = HIM_STORY[nextIdx];
+  if (next.day !== G.day) return;
+  // 45-second workday split: AM = first 18s, PM = 25s onward
+  const isAM = next.slot === 'AM';
+  const threshold = isAM ? 6 : 24;
+  if (G.workTime < threshold) return;
+
+  // Fire
+  G.himPaused = true;
+  G.himStoryIndex = nextIdx + 1;
+  // Effects apply on dismiss
+  showHimMessage(next, () => {
+    G.fun = Math.max(0, Math.min(100, G.fun + (next.fun || 0)));
+    G.focus = Math.max(0, Math.min(100, G.focus + (next.focus || 0)));
+    G.boss = Math.max(0, Math.min(100, G.boss + (next.boss || 0)));
+    G.himPaused = false;
+    // Also write a dialogue echo for continuity
+    setDialogue('ZHENG', next.react);
+    updateFocusBtnLock();
+  });
+}
+
+// ------- Palette (dusty atmospheric pixel art) -------
+const C = {
+  // Walls
+  wall:        '#3a2a4e',
+  wallDark:    '#2a1a3e',
+  wallLight:   '#4e3a66',
+  wallHL:      '#6a4e82',
+  pillar:      '#4a2a5e',
+  pillarLight: '#6a4a7e',
+  pillarDark:  '#1e0e30',
+  trim:        '#2a1438',
+
+  // Floor
+  floor:       '#8c3d4d',
+  floorLight:  '#b05868',
+  floorDark:   '#5c2030',
+  floorMortar: '#2a0e16',
+
+  // Wood
+  deskWood:    '#3a2028',
+  deskLight:   '#5a3846',
+  deskDark:    '#20101a',
+  shelfWood:   '#4a2a36',
+  shelfDark:   '#2a1420',
+
+  // Character: Zheng (stylish, not girly)
+  skin:        '#f0c49a',
+  skinShade:   '#c09070',
+  skinDark:    '#7a5040',
+  hair:        '#120818',      // jet black
+  hairHL:      '#2a1a36',
+  hairBlue:    '#4a78c0',      // blue streak
+  hairBlueLt:  '#7aa8e0',
+  eyesDark:    '#0a0612',
+  lip:         '#8a2a40',
+  earring:     '#d8b848',
+  top:         '#181018',      // cropped black shirt
+  topHL:       '#30202e',
+  topShadow:   '#0a0410',
+  pants:       '#2a3248',      // wide trousers
+  pantsDark:   '#18202e',
+  shoes:       '#1a0a14',
+  shoesHL:     '#2a1824',
+
+  // Sandal
+  larsHair:    '#e8d090',
+  larsHairHL:  '#f5e8b0',
+  larsSkin:    '#f0d5b8',
+  larsSkinShd: '#c8a888',
+  larsEyes:    '#3a5a8a',
+  larsVest:    '#3a4a68',      // Patagonia-vest navy
+  larsVestHL:  '#5a6a88',
+  larsShirt:   '#f0eade',
+  larsShirtSh: '#b8b0a0',
+
+  // Kinu (Abyssinian — ticked ruddy coat)
+  catBase:     '#b26844',
+  catLight:    '#d89068',
+  catDark:     '#7a3c1e',
+  catTick:     '#4a2010',
+  catBelly:    '#f0d0a8',
+  catNose:     '#d08878',
+  catEye:      '#f0c040',
+  catEyeDark:  '#8a6020',
+  vomit:       '#8a9a3a',
+  vomitDark:   '#5a6820',
+  vomitHL:     '#b8c560',
+
+  // Furniture & decor
+  bed:         '#3a5ea0',
+  bedHL:       '#5a7ec0',
+  bedShadow:   '#1e2e5a',
+  pillow:      '#e8d8a0',
+  pillowShade: '#b0a070',
+  rug:         '#a43050',
+  rugHL:       '#d05878',
+  rugDark:     '#5a1828',
+  rugGold:     '#d8b040',
+
+  // Window
+  window:      '#5ea0c0',
+  windowHL:    '#8ec8e0',
+  windowDark:  '#2a5478',
+  windowFrame: '#c8a878',
+  windowFrameDk: '#7a5a38',
+
+  // Plant
+  plantPot:    '#6a3828',
+  plantPotHL:  '#8a5240',
+  plantLeaf:   '#4a7a38',
+  plantLeafHL: '#6a9a50',
+  plantLeafDk: '#2a4a1a',
+
+  // Monitor / screen
+  monitor:     '#181220',
+  monitorHL:   '#2a1e34',
+  screen:      '#2a5a9a',
+  screenHL:    '#4a80c8',
+  screenText:  '#6a9cd0',
+
+  // Lamp
+  lampMetal:   '#6a7ea8',
+  lampMetalDk: '#3a4a68',
+  lampGlow:    '#ffe4a0',
+  lampCore:    '#fff5d8',
+  lampHalo:    'rgba(255, 220, 140, 0.18)',
+
+  // Books (shelf spines)
+  bookA: '#a83040',
+  bookB: '#d08040',
+  bookC: '#e8c050',
+  bookD: '#4070b0',
+  bookE: '#5a8a60',
+  bookF: '#7a4078',
+  bookG: '#2a5a8a',
+
+  // Misc
+  poster:   '#d04060',
+  posterDk: '#8a2840',
+  paper:    '#f0e8d0',
+  paperDk:  '#b8a880',
+  coffee:   '#6a3028',
+  coffeeHL: '#9a5a48',
+  matcha:   '#8aa050',
+};
+
+// ==================================================
+// PIXEL ART HELPERS
+// ==================================================
+function px(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+}
+function rect(x, y, w, h, color) { px(x,y,w,h,color); }
+
+// Sprite drawn from a string grid. Each char = color from map.
+function sprite(x, y, scale, grid, cmap) {
+  for (let row = 0; row < grid.length; row++) {
+    const line = grid[row];
+    for (let col = 0; col < line.length; col++) {
+      const ch = line[col];
+      if (ch === ' ' || ch === '.') continue;
+      const color = cmap[ch];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(x + col*scale, y + row*scale, scale, scale);
+    }
+  }
+}
+
+// ==================================================
+// SPRITES — detailed, shaded, stylish
+// ==================================================
+// Zheng: stylish, sharp undercut with blue streak, cropped black top, wide trousers
+// Legend for zheng_stand:
+//   H = hair black, h = hair highlight, b = blue streak, B = blue highlight
+//   S = skin, s = skin shade, e = eye, l = lip, r = earring
+//   T = top black, t = top highlight, d = top shadow
+//   P = pants navy, p = pants dark
+//   F = shoes, f = shoe highlight
+const SPR = {
+  zheng_sleep: [
+    '  pppppppppppp  ',
+    '  pppppppppppp  ',
+    '  pppHHhhhhHpp  ',
+    '  ppHHbbhhHHpp  ',
+    '  ppHSsssssHpp  ',
+    '  ppSxssxsSSpp  ',
+    '  ppSsslllsSpp  ',
+    '   pssssssssp   ',
+    '    BBBBBBBB    ',
+    '   BBBBBBBBBB   ',
+    '   BdBBdBBdBB   ',
+    '   BBBBBBBBBB   ',
+  ],
+  zheng_stand: [
+    '    HHHHHH    ',
+    '   HHhhhhHH   ',
+    '   HhbBhhhH   ',
+    '   HbbBhhhH   ',
+    '   HSsssssH   ',
+    '   SSseeeSS   ',
+    '    SssmsS    ',
+    '    sSssSs    ',
+    '   TTTTTTTT   ',
+    '  TTtdttdtTT  ',
+    '  TttdttdttT  ',
+    '  TdddttdddT  ',
+    '  TdddttdddT  ',
+    '   TttttttT   ',
+    '   PP    PP   ',
+    '   PP    PP   ',
+    '   Pp    pP   ',
+    '   Pp    pP   ',
+    '   FF    FF   ',
+  ],
+  zheng_burned: [ // slumped, defeated pose
+    '     .HHHHHH.   ',
+    '    HHhhhhhhHH  ',
+    '   HhbbhhhhhhH  ',
+    '  HHbbBhhhhhhH  ',
+    '  HHsSsssssSH   ',
+    '  .sSxssssxSs   ',  // x = closed eye
+    '   sSssllssS    ',
+    '   TTTTTTTT     ',
+    '  TdddttttdT    ',
+    '  TddtttttdT    ',
+    '  TdddttdddT    ',
+    '   PPP  PPP     ',
+    '   PpP  PpP     ',
+    '   FF    FF     ',
+  ],
+  // Kinu: Abyssinian, ticked ruddy coat, big amber eyes, tall ears
+  // K = base, k = light tick, D = dark tick, T = darkest tick line
+  // B = belly cream, E = eye amber, e = eye pupil, N = nose pink, W = whisker
+  cat_sit: [
+    '   D  D     D  D   ',
+    '   TDTDK   KDTDT   ',
+    '   TDkKK   KKkDT   ',
+    '   DKkkKKKKKkkKD   ',
+    '  DKkkKKKKKKKkkKD  ',
+    '  DKKKEeKKEeKKKKKD ',
+    '  DKKKkkkkkkkKKKKD ',
+    '  DKKNkkkWkkKKKKKD ',
+    '   DKkBBKBBKkKKKD  ',
+    '   DKBBBBBBBKKKD   ',
+    '   KBBBBBBBBKKD    ',
+    '    KBBBBBBKKD     ',
+    '    KKKBBBKKKD     ',
+    '    DKKKKKKDD      ',
+  ],
+  cat_walk: [
+    '   D  D     D  D   ',
+    '   TDTDK   KDTDT   ',
+    '   TDkKK   KKkDT   ',
+    '   DKkkKKKKKkkKD   ',
+    '  DKkkKKKKKKKkkKD  ',
+    '  DKKKEeKKEeKKKKKDD',
+    '  DKKKkkkkkkkKKKKKD',
+    '  DKKNkkkWkkKKKKKKD',
+    '   DKBBBBBBBKKKKKkD',
+    '   KBBBBBBBBKKKKkD ',
+    '    BBBBBBBBKKKkD  ',
+    '    D  D     DD    ',
+    '    D  D     D     ',
+  ],
+  cat_vomit: [
+    '   D  D     D  D      ',
+    '   TDTDK   KDTDT      ',
+    '   DKkkKKKKKkkKD      ',
+    '  DKkkKKKKKKKkkKD     ',
+    '  DKKKEeKKEeKKKKKD    ',
+    '  DKKKkkkkkkkKKKKD    ',
+    '  DKKNkkkWkkKKKKKD vvv',
+    '   DKkBBKBBKkKKKDvvvv',
+    '   DKBBBBBBBKKKDvvvvv',
+    '    KBBBBBBBBKKvvvv  ',
+    '    KKKBBBKKK   vv   ',
+    '    DKKKKKKDD        ',
+  ],
+  // Sandal: slicked blond, tall, Patagonia-vest smug
+  lars: [
+    '   HHHHHHHH   ',
+    '  HHhHhhhhHH  ',
+    '  HhhhhhhhhH  ',
+    '   HSssssSH   ',
+    '   SSseeesS   ',
+    '    SsssmS    ',
+    '    sSssSs    ',
+    '    WWWWWW    ',
+    '   VWWWWWWV   ',
+    '  VVWwwwwWVV  ',
+    '  VVWwwwwWVV  ',
+    '  VVWwwwwWVV  ',
+    '  VVWwwwwWVV  ',
+    '   VWWWWWWV   ',
+    '   PP    PP   ',
+    '   PP    PP   ',
+    '   Pp    pP   ',
+    '   Pp    pP   ',
+    '   FF    FF   ',
+  ],
+};
+
+// color maps per sprite
+const CM = {
+  zheng_sleep: {
+    p: '#fff5dc',       // pillow cream
+    H: C.hair, h: C.hairHL, b: C.hairBlue,
+    S: C.skin, s: C.skinShade,
+    x: '#2a1a36',       // closed eye line
+    l: C.lip,
+    B: '#b83a40',       // duvet red
+    d: '#7a2028',       // duvet shadow
+  },
+  zheng_stand: {
+    H: C.hair, h: C.hairHL, b: C.hairBlue, B: C.hairBlueLt,
+    S: C.skin, s: C.skinShade, e: C.eyesDark, l: C.lip, r: C.earring,
+    T: C.top, t: C.topHL, d: C.topShadow,
+    P: C.pants, p: C.pantsDark,
+    F: C.shoes, f: C.shoesHL,
+  },
+  zheng_burned: {
+    H: C.hair, h: C.hairHL, b: C.hairBlue, B: C.hairBlueLt,
+    S: C.skinShade, s: C.skinDark, x: C.eyesDark, l: C.lip,
+    T: C.topShadow, t: C.top, d: C.hair,
+    P: C.pantsDark, p: C.pants,
+    F: C.shoes,
+  },
+  cat: {
+    K: C.catBase, k: C.catLight, D: C.catDark, T: C.catTick,
+    B: C.catBelly, E: C.catEye, e: C.catEyeDark,
+    N: C.catNose, W: C.catBelly,
+    v: C.vomit,
+  },
+  lars: {
+    H: C.larsHair, h: C.larsHairHL,
+    S: C.larsSkin, s: C.larsSkinShd, e: C.larsEyes, m: C.lip,
+    W: C.larsShirt, w: C.larsShirtSh,
+    V: C.larsVest, v: C.larsVestHL,
+    P: C.pants, p: C.pantsDark, F: C.shoes,
+  },
+};
+
+// ==================================================
+// SCENE HELPERS — architecture + props
+// ==================================================
+function drawWallBase(floorY) {
+  // Gradient-ish wall with horizontal shading bands
+  px(0, 0, W, floorY, C.wall);
+  // Subtle vertical shading on left + right edges
+  for (let x = 0; x < 60; x += 4) {
+    const a = (1 - x/60) * 0.35;
+    ctx.fillStyle = 'rgba(20, 10, 30, ' + a.toFixed(2) + ')';
+    ctx.fillRect(x, 0, 4, floorY);
+    ctx.fillRect(W - x - 4, 0, 4, floorY);
+  }
+  // Top shadow (ceiling)
+  ctx.fillStyle = 'rgba(10, 4, 20, 0.55)';
+  ctx.fillRect(0, 0, W, 30);
+  // Floor trim band
+  px(0, floorY - 12, W, 6, C.wallDark);
+  px(0, floorY - 6, W, 6, C.trim);
+}
+function drawBrickFloor(floorY) {
+  const tileH = 14, tileW = 44;
+  for (let row = 0; (floorY + row * tileH) < H; row++) {
+    const y = floorY + row * tileH;
+    const offset = (row % 2) * (tileW / 2);
+    for (let x = -tileW; x < W + tileW; x += tileW) {
+      const tx = x + offset;
+      // base
+      px(tx, y, tileW - 2, tileH - 2, C.floor);
+      // highlight on top edge
+      px(tx, y, tileW - 2, 2, C.floorLight);
+      // shadow on bottom
+      px(tx, y + tileH - 4, tileW - 2, 2, C.floorDark);
+      // mortar gap
+      px(tx + tileW - 2, y, 2, tileH, C.floorMortar);
+      px(tx, y + tileH - 2, tileW, 2, C.floorMortar);
+    }
+  }
+  // perspective darkening toward top of floor
+  const grad = ctx.createLinearGradient(0, floorY, 0, floorY + 60);
+  grad.addColorStop(0, 'rgba(20, 10, 24, 0.45)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, floorY, W, 60);
+}
+function drawPillar(x, topY, botY) {
+  const w = 42;
+  // shadow behind pillar
+  ctx.fillStyle = 'rgba(10,5,20,0.5)';
+  ctx.fillRect(x - 4, topY, w + 8, botY - topY);
+  // main
+  px(x, topY, w, botY - topY, C.pillar);
+  // left face
+  px(x, topY, 10, botY - topY, C.pillarDark);
+  // right highlight
+  px(x + w - 10, topY, 10, botY - topY, C.pillarLight);
+  // capital + base
+  px(x - 6, topY, w + 12, 10, C.pillarLight);
+  px(x - 6, topY + 10, w + 12, 4, C.pillarDark);
+  px(x - 6, botY - 14, w + 12, 4, C.pillarDark);
+  px(x - 6, botY - 10, w + 12, 10, C.pillarLight);
+}
+function drawPendantLamp(cx, topY, bulbY) {
+  // chain
+  for (let y = topY; y < bulbY - 26; y += 6) {
+    px(cx - 2, y, 4, 3, C.lampMetal);
+    px(cx - 2, y + 3, 4, 3, C.lampMetalDk);
+  }
+  // shade (trumpet)
+  px(cx - 22, bulbY - 26, 44, 6, C.lampMetalDk);
+  px(cx - 26, bulbY - 20, 52, 8, C.lampMetal);
+  px(cx - 20, bulbY - 12, 40, 6, C.lampMetalDk);
+  // bulb
+  px(cx - 10, bulbY - 6, 20, 16, C.lampGlow);
+  px(cx - 6, bulbY - 4, 12, 12, C.lampCore);
+  px(cx - 4, bulbY - 2, 8, 8, '#ffffff');
+  // halo glow (radial)
+  const g = ctx.createRadialGradient(cx, bulbY + 2, 4, cx, bulbY + 2, 180);
+  g.addColorStop(0, 'rgba(255, 230, 160, 0.35)');
+  g.addColorStop(0.4, 'rgba(255, 220, 140, 0.12)');
+  g.addColorStop(1, 'rgba(255, 220, 140, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - 200, bulbY - 160, 400, 360);
+}
+function drawBookshelf(x, y, w, h) {
+  // back panel
+  px(x, y, w, h, C.shelfDark);
+  // frame
+  px(x, y, w, 6, C.shelfWood);
+  px(x, y + h - 6, w, 6, C.shelfWood);
+  px(x, y, 6, h, C.shelfWood);
+  px(x + w - 6, y, 6, h, C.shelfWood);
+  // shelves
+  const shelves = 4;
+  const shelfGap = Math.floor((h - 12) / shelves);
+  for (let i = 1; i < shelves; i++) {
+    px(x + 6, y + i * shelfGap, w - 12, 4, C.shelfWood);
+  }
+  // books
+  const bookColors = [C.bookA, C.bookB, C.bookC, C.bookD, C.bookE, C.bookF, C.bookG];
+  for (let s = 0; s < shelves; s++) {
+    let bx = x + 10;
+    const by = y + s * shelfGap + 8;
+    const bh = shelfGap - 12;
+    while (bx < x + w - 16) {
+      const bw = 8 + Math.floor(((bx * 7 + s * 13) % 11));
+      const color = bookColors[(bx + s * 3) % bookColors.length];
+      const lean = ((bx + s) % 7) === 0 ? 2 : 0;
+      // Skip some to show gaps
+      if ((bx + s * 5) % 23 !== 0) {
+        px(bx, by + lean, bw, bh - lean, color);
+        // spine highlight
+        px(bx, by + lean, 1, bh - lean, 'rgba(255,255,255,0.15)');
+        // shadow
+        px(bx + bw - 2, by + lean, 2, bh - lean, 'rgba(0,0,0,0.25)');
+        // title stripe
+        if (bh > 24) px(bx + 1, by + lean + 8, bw - 2, 2, 'rgba(255,255,255,0.12)');
+      }
+      bx += bw + 2;
+    }
+  }
+}
+function drawPlant(cx, baseY) {
+  // pot
+  px(cx - 22, baseY - 30, 44, 30, C.plantPot);
+  px(cx - 24, baseY - 34, 48, 6, C.plantPotHL);
+  px(cx - 22, baseY - 30, 44, 3, 'rgba(255,255,255,0.1)');
+  px(cx - 20, baseY - 4, 40, 4, C.pillarDark);
+  // leaves — clustered, shaded
+  const clusters = [
+    { x: cx - 4, y: baseY - 60, col: C.plantLeaf },
+    { x: cx + 10, y: baseY - 70, col: C.plantLeafHL },
+    { x: cx - 20, y: baseY - 52, col: C.plantLeafDk },
+    { x: cx + 18, y: baseY - 48, col: C.plantLeafDk },
+    { x: cx - 10, y: baseY - 76, col: C.plantLeafHL },
+    { x: cx + 4, y: baseY - 84, col: C.plantLeaf },
+  ];
+  for (const c of clusters) {
+    px(c.x - 6, c.y + 2, 14, 22, c.col);
+    px(c.x - 10, c.y + 8, 22, 12, c.col);
+    px(c.x - 2, c.y - 6, 6, 10, c.col);
+  }
+}
+// Bright daytime window with trees outside — inspired by the office reference
+function drawBigWindow(x, y, w, h, panes) {
+  panes = panes || 3;
+  // outer frame
+  px(x - 6, y - 6, w + 12, h + 12, '#f0e8dc');
+  px(x - 6, y - 6, w + 12, 6, '#d8cab4');
+  px(x - 4, y - 4, w + 8, h + 8, '#a89680');
+  px(x - 2, y - 2, w + 4, h + 4, '#f8f0e4');
+  // sky gradient
+  const sky = ctx.createLinearGradient(0, y, 0, y + h);
+  sky.addColorStop(0, '#aed8f0');
+  sky.addColorStop(0.5, '#cce8f5');
+  sky.addColorStop(1, '#e8f4fb');
+  ctx.fillStyle = sky;
+  ctx.fillRect(x, y, w, h);
+  // clouds
+  px(x + 18, y + 20, 34, 6, '#f8fcff');
+  px(x + 22, y + 16, 26, 4, '#ffffff');
+  px(x + w - 70, y + 36, 40, 5, '#f8fcff');
+  px(x + w - 60, y + 32, 28, 3, '#ffffff');
+  // distant buildings
+  const groundY = y + h - 30;
+  px(x, groundY, w, 30, '#b8d5c8');
+  // trees (clustered foliage)
+  const trees = Math.max(3, Math.floor(w / 36));
+  for (let i = 0; i < trees; i++) {
+    const tx = x + 8 + i * Math.floor((w - 16) / (trees - 1)) - 10;
+    const ty = groundY - 40 - ((i * 7) % 14);
+    const trunkH = 16 + ((i * 3) % 8);
+    // trunk
+    px(tx + 10, ty + 26, 6, trunkH, '#5a3620');
+    // foliage cluster — multiple layered ovals
+    const greens = ['#2a6a3a', '#3a8a4a', '#4aa05a'];
+    for (let g = 0; g < 3; g++) {
+      const gy = ty + 6 - g * 4;
+      const gx = tx + 2 - g;
+      const gw = 22 + g * 2;
+      const gh = 18 - g * 4;
+      px(gx, gy, gw, gh, greens[g % greens.length]);
+      px(gx + 2, gy, gw - 4, 2, greens[(g + 1) % 3]);
+    }
+    // dark base
+    px(tx, ty + 22, 28, 4, '#1a4a22');
+  }
+  // farther hills silhouette
+  for (let hx = x; hx < x + w; hx += 24) {
+    const hh = 6 + ((hx * 13) % 8);
+    px(hx, groundY - hh, 24, hh, '#7aa090');
+  }
+  // window panes (crossbars)
+  if (panes > 1) {
+    const paneW = w / panes;
+    for (let i = 1; i < panes; i++) {
+      px(x + Math.floor(i * paneW) - 2, y, 4, h, '#f0e8dc');
+    }
+  }
+  px(x, y + Math.floor(h / 2) - 2, w, 4, '#f0e8dc');
+  // sill
+  px(x - 8, y + h, w + 16, 10, '#a89680');
+  px(x - 8, y + h, w + 16, 4, '#f0e8dc');
+}
+
+// Swivel office chair (back view — chair behind/next to the desk)
+function drawSwivelChair(cx, topY, color) {
+  color = color || '#6a7a8a';
+  const seatY = topY + 48;
+  // backrest
+  px(cx - 20, topY, 40, 46, color);
+  px(cx - 20, topY, 40, 6, '#2a2a30');
+  px(cx + 14, topY, 6, 46, '#2a2a30');
+  px(cx - 20, topY, 6, 46, '#8a9ab0');
+  // seat
+  px(cx - 26, seatY, 52, 12, color);
+  px(cx - 26, seatY, 52, 3, '#8a9ab0');
+  px(cx - 26, seatY + 9, 52, 3, '#2a2a30');
+  // post
+  px(cx - 3, seatY + 12, 6, 20, '#3a3a44');
+  // 5-star base
+  px(cx - 24, seatY + 30, 48, 4, '#5a5a66');
+  px(cx - 20, seatY + 34, 40, 3, '#2a2a30');
+  // wheels
+  for (let i = -2; i <= 2; i++) {
+    px(cx + i * 10 - 3, seatY + 37, 6, 4, '#1a1a20');
+  }
+}
+
+// Small framed artwork
+function drawFrame(x, y, w, h, artFn) {
+  px(x - 2, y - 2, w + 4, h + 4, '#5a3a28');
+  px(x, y, w, h, '#f0e8d0');
+  artFn(x + 4, y + 4, w - 8, h - 8);
+}
+
+// ---- Bedroom props inspired by the warm burgundy reference ----
+function drawStringLights(y) {
+  // Two swoops of lights across the upper wall
+  ctx.strokeStyle = '#3a1a28';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(120, y);
+  ctx.quadraticCurveTo(400, y + 40, 680, y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(200, y + 10);
+  ctx.quadraticCurveTo(420, y + 52, 620, y + 8);
+  ctx.stroke();
+  // draw bulbs
+  const t = performance.now() / 500;
+  for (let i = 0; i < 2; i++) {
+    const startX = i === 0 ? 120 : 200;
+    const endX   = i === 0 ? 680 : 620;
+    const baseY  = i === 0 ? y : y + 10;
+    const sag    = i === 0 ? 40 : 42;
+    for (let k = 0; k < 22; k++) {
+      const u = k / 21;
+      const bx = startX + (endX - startX) * u;
+      const by = baseY + 4 * sag * u * (1 - u); // quadratic curve approx
+      // twinkle
+      const tw = 0.6 + 0.4 * Math.sin(t + i + k * 0.4);
+      ctx.fillStyle = 'rgba(255, 220, 140, ' + tw.toFixed(2) + ')';
+      ctx.fillRect(bx - 2, by + 2, 4, 6);
+      ctx.fillStyle = '#fff6c8';
+      ctx.fillRect(bx - 1, by + 3, 2, 3);
+      // soft glow
+      const g = ctx.createRadialGradient(bx, by + 4, 0, bx, by + 4, 14);
+      g.addColorStop(0, 'rgba(255, 220, 140, ' + (0.25 * tw).toFixed(2) + ')');
+      g.addColorStop(1, 'rgba(255, 220, 140, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(bx - 16, by - 10, 32, 26);
+    }
+  }
+}
+
+function drawWardrobe(x, y, w, h) {
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x + 4, y + h, w, 8);
+  // body
+  px(x, y, w, h, '#3a2014');
+  // top trim
+  px(x - 4, y - 4, w + 8, 8, '#5a321e');
+  px(x - 4, y - 4, w + 8, 2, '#7a4a30');
+  // two doors
+  const dw = (w - 12) / 2;
+  px(x + 4, y + 6, dw, h - 12, '#5a3420');
+  px(x + 4, y + 6, dw, 3, '#7a4a30');
+  px(x + 4, y + 6, 3, h - 12, '#7a4a30');
+  px(x + 4 + dw + 4, y + 6, dw, h - 12, '#5a3420');
+  px(x + 4 + dw + 4, y + 6, dw, 3, '#7a4a30');
+  px(x + 4 + dw + 4, y + 6, 3, h - 12, '#7a4a30');
+  // handles
+  px(x + 4 + dw - 4, y + h/2 - 12, 3, 24, '#2a1408');
+  px(x + 4 + dw + 7, y + h/2 - 12, 3, 24, '#2a1408');
+  // door shadow
+  px(x + 4, y + h - 12, dw, 3, '#2a1408');
+  px(x + 4 + dw + 4, y + h - 12, dw, 3, '#2a1408');
+}
+
+function drawDresser(x, y, w, h) {
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x + 4, y + h, w, 8);
+  // body
+  px(x, y, w, h, '#3a2014');
+  // top
+  px(x - 4, y - 4, w + 8, 8, '#7a4a30');
+  px(x - 4, y - 4, w + 8, 2, '#a0684a');
+  // 3 drawers
+  const drawerH = Math.floor((h - 18) / 3);
+  for (let i = 0; i < 3; i++) {
+    const dy = y + 4 + i * (drawerH + 3);
+    px(x + 4, dy, w - 8, drawerH, '#5a3420');
+    px(x + 4, dy, w - 8, 2, '#7a4a30');
+    px(x + 4, dy + drawerH - 2, w - 8, 2, '#2a1408');
+    // handle (inverted triangle handle)
+    px(x + w/2 - 5, dy + drawerH/2 - 2, 10, 3, '#2a1408');
+    px(x + w/2 - 3, dy + drawerH/2 + 1, 6, 2, '#2a1408');
+  }
+}
+
+function drawBedsideTable(x, y) {
+  // table body
+  px(x, y, 50, 60, '#3a2014');
+  px(x - 3, y - 3, 56, 6, '#5a3420');
+  px(x - 3, y - 3, 56, 2, '#7a4a30');
+  // drawer line
+  px(x + 4, y + 18, 42, 3, '#2a1408');
+  // legs
+  px(x + 4, y + 60, 6, 10, '#2a1408');
+  px(x + 40, y + 60, 6, 10, '#2a1408');
+  // handle
+  px(x + 22, y + 10, 6, 3, '#2a1408');
+}
+
+function drawBedsideLamp(cx, baseY) {
+  // base
+  px(cx - 8, baseY - 6, 16, 8, '#2a1408');
+  px(cx - 10, baseY - 2, 20, 4, '#2a1408');
+  // post
+  px(cx - 2, baseY - 22, 4, 18, '#4a2a18');
+  // shade
+  px(cx - 16, baseY - 40, 32, 10, '#e8c870');
+  px(cx - 14, baseY - 42, 28, 4, '#f5d890');
+  px(cx - 18, baseY - 32, 36, 6, '#b89850');
+  // warm glow halo
+  const g = ctx.createRadialGradient(cx, baseY - 34, 4, cx, baseY - 34, 80);
+  g.addColorStop(0, 'rgba(255, 220, 140, 0.3)');
+  g.addColorStop(1, 'rgba(255, 220, 140, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - 90, baseY - 110, 180, 140);
+}
+
+function drawOvalRug(cx, cy, rw, rh) {
+  // Simulate pixel oval via step-wise rectangles
+  for (let dy = -rh; dy <= rh; dy += 3) {
+    const f = 1 - (dy * dy) / (rh * rh);
+    if (f <= 0) continue;
+    const w = Math.round(Math.sqrt(f) * rw);
+    px(cx - w, cy + dy, w * 2, 3, '#f0e2bc');
+  }
+  // inner highlight
+  for (let dy = -rh + 6; dy <= rh - 6; dy += 3) {
+    const f = 1 - (dy * dy) / ((rh - 6) * (rh - 6));
+    if (f <= 0) continue;
+    const w = Math.round(Math.sqrt(f) * (rw - 10));
+    px(cx - w, cy + dy, w * 2, 3, '#f8edc8');
+  }
+  // subtle shadow edge
+  for (let dy = rh - 10; dy <= rh; dy += 3) {
+    const f = 1 - (dy * dy) / (rh * rh);
+    if (f <= 0) continue;
+    const w = Math.round(Math.sqrt(f) * rw);
+    px(cx - w, cy + dy, w * 2, 3, '#d8c498');
+  }
+}
+
+function drawWoodPlankFloor(y) {
+  // horizontal planks, warm brown, with subtle grain
+  const ph = 22;
+  for (let row = 0; y + row * ph < H; row++) {
+    const yy = y + row * ph;
+    // alternating plank tone
+    const base = (row % 2 === 0) ? '#5a3624' : '#4e2e1e';
+    px(0, yy, W, ph - 2, base);
+    // highlight top line
+    px(0, yy, W, 2, (row % 2 === 0) ? '#7a4a32' : '#6a3e28');
+    // shadow between planks
+    px(0, yy + ph - 2, W, 2, '#2a1608');
+    // grain marks (random positions)
+    for (let g = 0; g < W; g += 60) {
+      const gx = g + ((row * 17) % 40);
+      px(gx, yy + 6, 24, 1, 'rgba(40, 20, 10, 0.35)');
+      px(gx + 6, yy + 14, 14, 1, 'rgba(40, 20, 10, 0.25)');
+    }
+  }
+}
+
+// Brick wainscot (lower wall band)
+function drawBrickWall(y, h) {
+  const bw = 40, bh = 18;
+  for (let row = 0; row * bh < h; row++) {
+    const yy = y + row * bh;
+    const offset = (row % 2) * (bw / 2);
+    for (let x = -bw; x < W + bw; x += bw) {
+      const xx = x + offset;
+      px(xx, yy, bw - 2, bh - 2, '#a04030');
+      px(xx, yy, bw - 2, 3, '#c8604c');
+      px(xx, yy + bh - 4, bw - 2, 2, '#6a2818');
+      px(xx + bw - 2, yy, 2, bh, '#2a0a08');
+      px(xx, yy + bh - 2, bw, 2, '#2a0a08');
+    }
+  }
+}
+
+function drawArchWindow(x, y, w, h) {
+  // frame
+  px(x - 6, y - 6, w + 12, h + 12, C.windowFrameDk);
+  px(x - 4, y - 4, w + 8, h + 8, C.windowFrame);
+  // inner deep pane
+  px(x, y, w, h, C.windowDark);
+  // sky gradient
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, '#3a5f8a');
+  g.addColorStop(0.7, '#6ea0c4');
+  g.addColorStop(1, '#a8c8dc');
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  // crossbar
+  px(x, y + h/2 - 2, w, 4, C.windowFrame);
+  px(x + w/2 - 2, y, 4, h, C.windowFrame);
+  // clouds
+  px(x + 14, y + 22, 28, 6, '#f0e8d0');
+  px(x + 20, y + 18, 20, 4, '#f8f0dc');
+  px(x + w - 44, y + h - 40, 24, 5, '#f0e8d0');
+  // city silhouette
+  px(x, y + h - 20, w, 20, '#1e2a48');
+  px(x + 20, y + h - 34, 10, 14, '#1e2a48');
+  px(x + 60, y + h - 38, 14, 18, '#1e2a48');
+  px(x + 90, y + h - 30, 8, 10, '#1e2a48');
+  // light spill onto floor below the window — added in scene
+}
+
+// ==================================================
+// SCENES
+// ==================================================
+const FLOOR_Y = 400;
+
+function drawBedroom() {
+  // Warm burgundy wall
+  px(0, 0, W, FLOOR_Y, '#5a2638');
+  // darker top (ceiling shadow)
+  const ceilG = ctx.createLinearGradient(0, 0, 0, 80);
+  ceilG.addColorStop(0, 'rgba(30, 10, 22, 0.7)');
+  ceilG.addColorStop(1, 'rgba(30, 10, 22, 0)');
+  ctx.fillStyle = ceilG;
+  ctx.fillRect(0, 0, W, 80);
+  // wall shading on corners
+  for (let x = 0; x < 40; x += 4) {
+    const a = (1 - x/40) * 0.4;
+    ctx.fillStyle = 'rgba(20, 5, 15, ' + a.toFixed(2) + ')';
+    ctx.fillRect(x, 0, 4, FLOOR_Y);
+    ctx.fillRect(W - x - 4, 0, 4, FLOOR_Y);
+  }
+  // trim where wall meets floor
+  px(0, FLOOR_Y - 8, W, 8, '#3a1020');
+
+  // String lights across upper wall
+  drawStringLights(60);
+
+  // Wardrobe on the left
+  drawWardrobe(90, 180, 140, 200);
+
+  // Dresser on the right
+  drawDresser(620, 240, 140, 140);
+
+  // Bedside tables flanking the bed
+  drawBedsideTable(310, 310);
+  drawBedsideTable(540, 310);
+  // Bedside lamps
+  drawBedsideLamp(335, 310);
+  drawBedsideLamp(565, 310);
+
+  // Wood plank floor
+  drawWoodPlankFloor(FLOOR_Y);
+
+  // Oval rug under the bed
+  drawOvalRug(450, 540, 200, 80);
+
+  // Bed — dark wood frame, red burgundy duvet, two white pillows
+  const bdx = 380, bdy = 330, bdw = 160, bdh = 180;
+  // frame shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(bdx - 4, bdy + bdh - 4, bdw + 8, 16);
+  // headboard (arched)
+  px(bdx - 14, bdy - 30, bdw + 28, 36, '#3a2014');
+  px(bdx - 14, bdy - 30, bdw + 28, 4, '#5a3420');
+  px(bdx - 8, bdy - 38, bdw + 16, 12, '#3a2014');
+  px(bdx - 4, bdy - 44, bdw + 8, 8, '#3a2014');
+  px(bdx - 4, bdy - 44, bdw + 8, 3, '#5a3420');
+  // bed side frame
+  px(bdx - 14, bdy + 6, 12, bdh + 8, '#3a2014');
+  px(bdx + bdw + 2, bdy + 6, 12, bdh + 8, '#3a2014');
+  px(bdx - 14, bdy + 6, 12, 3, '#5a3420');
+  px(bdx + bdw + 2, bdy + 6, 12, 3, '#5a3420');
+  // foot of bed
+  px(bdx - 14, bdy + bdh + 6, bdw + 28, 18, '#3a2014');
+  px(bdx - 14, bdy + bdh + 6, bdw + 28, 3, '#5a3420');
+  // mattress (top strip seen below pillows)
+  px(bdx, bdy + 6, bdw, 14, '#e8d8b8');
+  px(bdx, bdy + 6, bdw, 3, '#fff5d8');
+  // pillows (2)
+  px(bdx + 4, bdy + 10, 70, 42, '#fff5dc');
+  px(bdx + 4, bdy + 10, 70, 5, '#ffffff');
+  px(bdx + 4, bdy + 47, 70, 5, '#d8cfb4');
+  px(bdx + 84, bdy + 10, 70, 42, '#fff5dc');
+  px(bdx + 84, bdy + 10, 70, 5, '#ffffff');
+  px(bdx + 84, bdy + 47, 70, 5, '#d8cfb4');
+  // duvet (burgundy red)
+  px(bdx, bdy + 52, bdw, bdh - 48, '#b83a40');
+  px(bdx, bdy + 52, bdw, 5, '#d85a60');
+  px(bdx, bdy + bdh - 2, bdw, 8, '#7a1e24');
+  // duvet folds
+  for (let i = 0; i < 5; i++) {
+    px(bdx + 16 + i * 28, bdy + 90 + (i % 2) * 10, 18, 3, '#7a2028');
+  }
+  // duvet center fold (seam)
+  px(bdx + bdw/2 - 1, bdy + 52, 2, bdh - 48, 'rgba(0,0,0,0.15)');
+
+  // Framed painting above the bed (small, centered between string lights swoops)
+  drawFrame(420, 100, 70, 48, (ax, ay, aw, ah) => {
+    const sky = ctx.createLinearGradient(ax, ay, ax, ay + ah);
+    sky.addColorStop(0, '#f5d890');
+    sky.addColorStop(1, '#e85a70');
+    ctx.fillStyle = sky;
+    ctx.fillRect(ax, ay, aw, ah);
+    // silhouette mountains
+    px(ax, ay + ah - 18, aw, 18, '#4a2a38');
+    px(ax + 14, ay + ah - 28, 20, 14, '#4a2a38');
+    px(ax + 36, ay + ah - 24, 16, 12, '#4a2a38');
+  });
+
+  // Zheng sleeping on the bed
+  sprite(bdx - 18, bdy + 20, 3, SPR.zheng_sleep, CM.zheng_sleep);
+
+  // Vomit if present
+  if (G.vomitSpot && !G.vomitCleaned) {
+    drawVomit(G.vomitSpot.x, G.vomitSpot.y);
+  }
+
+  // Cat
+  if (G.cat) {
+    const spr = G.cat.vomiting ? SPR.cat_vomit : (G.cat.walking ? SPR.cat_walk : SPR.cat_sit);
+    sprite(G.cat.x, G.cat.y, 3, spr, CM.cat);
+  }
+
+  drawVignette();
+}
+
+function drawVomit(x, y) {
+  // pool shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(x - 22, y - 4, 44, 14);
+  // base splat
+  ctx.fillStyle = C.vomitDark;
+  ctx.fillRect(x - 20, y - 8, 40, 18);
+  ctx.fillRect(x - 14, y - 12, 28, 26);
+  // main blob
+  ctx.fillStyle = C.vomit;
+  ctx.fillRect(x - 16, y - 4, 32, 10);
+  ctx.fillRect(x - 10, y - 10, 20, 20);
+  // highlight
+  ctx.fillStyle = C.vomitHL;
+  ctx.fillRect(x - 4, y - 6, 6, 4);
+  ctx.fillRect(x + 2, y, 4, 3);
+  // chunks
+  ctx.fillStyle = C.vomitDark;
+  ctx.fillRect(x - 6, y + 4, 4, 3);
+  ctx.fillRect(x + 6, y - 2, 3, 3);
+}
+
+function drawVignette() {
+  const g = ctx.createRadialGradient(W/2, H/2, 200, W/2, H/2, 520);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(5, 2, 12, 0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawHomeOffice() {
+  drawWallBase(FLOOR_Y);
+  drawPillar(40, 0, FLOOR_Y - 12);
+  drawPillar(720, 0, FLOOR_Y - 12);
+
+  // Framed posters
+  px(120, 80, 110, 140, C.shelfWood);
+  px(126, 86, 98, 128, C.paper);
+  // poster abstract art
+  px(134, 100, 80, 20, C.bookA);
+  px(134, 124, 80, 20, C.bookD);
+  px(134, 148, 80, 20, C.bookE);
+  px(134, 172, 80, 14, C.bookC);
+  px(134, 192, 80, 10, C.poster);
+
+  px(260, 100, 80, 110, C.shelfWood);
+  px(266, 106, 68, 98, C.paper);
+  px(274, 120, 52, 60, C.bookD);
+  px(278, 128, 44, 44, '#3a5a8a');
+  px(280, 136, 16, 16, '#f0c49a'); // tiny face in photo
+
+  // Pendant lamp
+  drawPendantLamp(560, 0, 130);
+
+  // Arch window with light spill
+  drawArchWindow(420, 80, 120, 140);
+  // floor light pool under window
+  const lp = ctx.createRadialGradient(480, 340, 20, 480, 340, 200);
+  lp.addColorStop(0, 'rgba(255, 230, 170, 0.22)');
+  lp.addColorStop(1, 'rgba(255, 230, 170, 0)');
+  ctx.fillStyle = lp;
+  ctx.fillRect(300, 250, 360, 260);
+
+  drawBrickFloor(FLOOR_Y);
+
+  // Rug under desk
+  const rx = 200, ry = 440, rw = 440, rh = 80;
+  px(rx, ry, rw, rh, C.rugDark);
+  px(rx + 20, ry + 20, rw - 40, rh - 40, C.rug);
+  px(rx + 20, ry + 20, rw - 40, 4, C.rugHL);
+
+  // Desk (wood, with shadow)
+  const dx = 220, dy = 380, dw = 400, dh = 24;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(dx - 4, dy + dh - 2, dw + 8, 14);
+  px(dx, dy, dw, dh, C.deskWood);
+  px(dx, dy, dw, 4, C.deskLight);
+  px(dx, dy + dh - 4, dw, 4, C.deskDark);
+  // desk legs
+  px(dx + 10, dy + dh, 14, 160, C.deskDark);
+  px(dx + dw - 24, dy + dh, 14, 160, C.deskDark);
+  px(dx + 10, dy + dh, 14, 4, C.deskLight);
+  px(dx + dw - 24, dy + dh, 14, 4, C.deskLight);
+
+  // Monitor (detailed, with bezel + reflection)
+  const mx = 350, my = 240, mw = 160, mh = 120;
+  // shadow on desk
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(mx - 4, my + mh - 2, mw + 8, 8);
+  px(mx, my, mw, mh, C.monitor);
+  px(mx + 6, my + 6, mw - 12, mh - 12, C.screen);
+  px(mx + 6, my + 6, mw - 12, 6, C.screenHL);
+  // "code" on screen — neat terminal look
+  const lines = [8, 24, 18, 30, 14, 26, 20, 12];
+  for (let i = 0; i < lines.length; i++) {
+    px(mx + 12, my + 20 + i * 12, 8, 3, C.screenText);
+    px(mx + 24, my + 20 + i * 12, lines[i] * 2, 3, 'rgba(200, 220, 240, 0.5)');
+  }
+  // cursor
+  if (Math.floor(performance.now() / 500) % 2 === 0) {
+    px(mx + 24 + lines[lines.length-1] * 2 + 4, my + 20 + (lines.length-1)*12, 5, 3, '#fff');
+  }
+  // stand
+  px(mx + mw/2 - 14, my + mh, 28, 18, C.monitorHL);
+  px(mx + mw/2 - 30, my + mh + 18, 60, 6, C.monitor);
+
+  // Zheng at desk (stylish, facing forward)
+  sprite(260, 260, 4, G.burnout > 80 ? SPR.zheng_burned : SPR.zheng_stand,
+         G.burnout > 80 ? CM.zheng_burned : CM.zheng_stand);
+
+  // Matcha latte (replaces pink coffee cup)
+  const cupX = 540, cupY = 340;
+  px(cupX, cupY, 24, 24, '#e8d0a0');
+  px(cupX, cupY, 24, 4, '#fff5d8');
+  px(cupX + 4, cupY + 8, 16, 12, C.matcha);
+  px(cupX + 4, cupY + 8, 16, 2, '#b0c870');
+  px(cupX + 24, cupY + 6, 6, 14, '#e8d0a0');
+  // steam
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  const t = performance.now() / 300;
+  ctx.fillRect(cupX + 6, cupY - 14 + Math.sin(t) * 3, 3, 8);
+  ctx.fillRect(cupX + 14, cupY - 18 + Math.sin(t + 1) * 3, 3, 10);
+
+  // Small stack of books on desk
+  px(590, 352, 36, 6, C.bookD);
+  px(590, 358, 36, 6, C.bookA);
+  px(594, 364, 32, 6, C.bookC);
+
+  // Kinu on a cushion near desk
+  px(600, 480, 70, 14, C.rugDark);
+  px(604, 486, 62, 8, C.rug);
+  sprite(606, 446, 3, SPR.cat_sit, CM.cat);
+
+  // Home vomit splat (if Kinu recently vomited)
+  if (G.homeVomit) {
+    drawVomit(G.homeVomit.x, G.homeVomit.y);
+  }
+
+  drawVignette();
+}
+
+function drawCorpOffice() {
+  // --- Warm cream wall with brick wainscot below ---
+  px(0, 0, W, FLOOR_Y, '#d8c6a4');
+  // ceiling shadow
+  const ceilG = ctx.createLinearGradient(0, 0, 0, 70);
+  ceilG.addColorStop(0, 'rgba(80, 50, 30, 0.35)');
+  ceilG.addColorStop(1, 'rgba(80, 50, 30, 0)');
+  ctx.fillStyle = ceilG; ctx.fillRect(0, 0, W, 70);
+  // brick wainscot
+  const brickTop = FLOOR_Y - 88;
+  drawBrickWall(brickTop, 88);
+  // chair rail
+  px(0, brickTop - 6, W, 4, '#a07848');
+  px(0, brickTop - 2, W, 2, '#7a5830');
+  // baseboard
+  px(0, FLOOR_Y - 10, W, 10, '#3a2010');
+  // corner shadows
+  for (let x = 0; x < 50; x += 4) {
+    const a = (1 - x/50) * 0.22;
+    ctx.fillStyle = 'rgba(40, 20, 10, ' + a.toFixed(2) + ')';
+    ctx.fillRect(x, 0, 4, FLOOR_Y);
+    ctx.fillRect(W - x - 4, 0, 4, FLOOR_Y);
+  }
+
+  // --- Big window with trees, trees, trees ---
+  drawBigWindow(300, 50, 320, 190, 3);
+  // light spill
+  const spill = ctx.createRadialGradient(460, 360, 20, 460, 360, 300);
+  spill.addColorStop(0, 'rgba(255, 230, 170, 0.28)');
+  spill.addColorStop(1, 'rgba(255, 230, 170, 0)');
+  ctx.fillStyle = spill; ctx.fillRect(80, 240, 720, 320);
+
+  // --- Framed art left + right ---
+  drawFrame(110, 130, 100, 80, (ax, ay, aw, ah) => {
+    px(ax, ay, aw, Math.floor(ah/3), '#d04060');
+    px(ax, ay + Math.floor(ah/3), aw, Math.floor(ah/3), '#e8c050');
+    px(ax, ay + Math.floor(ah*2/3), aw, Math.floor(ah/3), '#4a78c0');
+  });
+  drawFrame(650, 130, 90, 80, (ax, ay, aw, ah) => {
+    const g = ctx.createLinearGradient(ax, ay, ax, ay + ah);
+    g.addColorStop(0, '#88c0e0'); g.addColorStop(1, '#e0d0a0');
+    ctx.fillStyle = g; ctx.fillRect(ax, ay, aw, ah);
+    px(ax + 20, ay + ah - 22, 10, 22, '#3a2a1a');
+    px(ax + 40, ay + ah - 28, 10, 28, '#3a2a1a');
+    px(ax + 58, ay + ah - 20, 10, 20, '#3a2a1a');
+  });
+
+  // --- Dark carpet grid ---
+  for (let y = FLOOR_Y; y < H; y += 24) {
+    for (let x = 0; x < W; x += 24) {
+      const even = ((x/24 + (y - FLOOR_Y)/24) % 2 === 0);
+      px(x, y, 24, 24, even ? '#5a4838' : '#4e3e30');
+      px(x, y, 24, 1, 'rgba(0,0,0,0.25)');
+      px(x, y, 1, 24, 'rgba(0,0,0,0.25)');
+    }
+  }
+
+  // --- Plants in corners ---
+  drawPlant(60, FLOOR_Y);
+  drawPlant(740, FLOOR_Y);
+
+  // --- Main desk (wood) ---
+  const dx = 200, dy = 380, dw = 420, dh = 28;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(dx - 6, dy + dh - 2, dw + 12, 18);
+  px(dx, dy, dw, dh, '#6a4830');
+  px(dx, dy, dw, 4, '#8a6848');
+  px(dx, dy + dh - 4, dw, 4, '#3a2012');
+  for (let x = dx + 10; x < dx + dw - 10; x += 44) {
+    px(x, dy + 8, 28, 1, 'rgba(40,20,10,0.4)');
+    px(x + 8, dy + 18, 20, 1, 'rgba(40,20,10,0.3)');
+  }
+  px(dx + 14, dy + dh, 14, 150, '#3a2012');
+  px(dx + dw - 28, dy + dh, 14, 150, '#3a2012');
+
+  // --- Monitor ---
+  const mx = 340, my = 258, mw = 170, mh = 120;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(mx - 4, my + mh - 2, mw + 8, 8);
+  px(mx, my, mw, mh, '#1a1220');
+  px(mx + 6, my + 6, mw - 12, mh - 12, '#2a5a9a');
+  px(mx + 6, my + 6, mw - 12, 6, '#4a80c8');
+  for (let col = 0; col < 3; col++) {
+    const cx2 = mx + 14 + col * 50;
+    px(cx2, my + 18, 44, 86, 'rgba(240,245,250,0.2)');
+    px(cx2, my + 18, 44, 3, '#6a9cd0');
+    for (let row = 0; row < 4; row++) {
+      px(cx2 + 2, my + 26 + row * 18, 40, 14, 'rgba(220,230,245,0.45)');
+    }
+  }
+  // stand
+  px(mx + mw/2 - 16, my + mh, 32, 16, '#2a1e34');
+  px(mx + mw/2 - 36, my + mh + 16, 72, 6, '#1a1220');
+
+  // --- Keyboard + mouse on desk ---
+  px(dx + 130, dy - 10, 160, 10, '#1a1220');
+  px(dx + 130, dy - 10, 160, 3, '#3a2a48');
+  for (let k = 0; k < 8; k++) px(dx + 138 + k * 20, dy - 6, 14, 4, '#4a3a58');
+  px(dx + 300, dy - 6, 16, 10, '#2a1e34');
+  px(dx + 300, dy - 6, 16, 3, '#4a3a58');
+
+  // --- Coffee mug ---
+  px(dx + 40, dy - 22, 26, 22, '#e8dcc0');
+  px(dx + 40, dy - 22, 26, 4, '#ffffff');
+  px(dx + 66, dy - 18, 6, 14, '#e8dcc0');
+  px(dx + 44, dy - 18, 18, 12, '#5a3a28');
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  const ttt = performance.now()/300;
+  ctx.fillRect(dx + 46, dy - 36 + Math.sin(ttt)*3, 3, 8);
+  ctx.fillRect(dx + 54, dy - 40 + Math.sin(ttt+1)*3, 3, 10);
+
+  // --- Stapler + papers ---
+  px(dx + 82, dy - 8, 38, 8, '#a84030');
+  px(dx + 82, dy - 3, 38, 3, '#7a2818');
+  px(dx + 360, dy - 5, 50, 5, '#f5edd4');
+  px(dx + 360, dy - 10, 50, 5, '#f5edd4');
+
+  // --- Coworker NPC at another desk (background right) ---
+  sprite(660, 240, 3, SPR.lars, {
+    H: '#5a3828', h: '#7a4a38', S: '#f0c49a', s: '#c09070',
+    e: '#1a1a2a', m: '#8a2a40',
+    W: '#ffd5c8', w: '#d8a898',
+    V: '#5a8a70', v: '#7aa890',
+    P: '#3a2838', p: '#1a0e1c', F: '#1a0a10',
+  });
+
+  // --- Empty second swivel chair ---
+  drawSwivelChair(660, 310, '#6a7a8a');
+
+  // --- Zheng at desk + his chair ---
+  sprite(260, 260, 4, G.burnout > 80 ? SPR.zheng_burned : SPR.zheng_stand,
+         G.burnout > 80 ? CM.zheng_burned : CM.zheng_stand);
+  // chair back behind Zheng
+  px(244, 320, 40, 30, '#2a2a34');
+  px(242, 318, 44, 6, '#1a1a20');
+
+  // --- Sandal ALWAYS visible, standing next to Zheng ---
+  const bob = Math.sin(performance.now()/900) * 6;
+  const sandalX = G.bossApproach ? G.bossApproach.x : 130 + bob;
+  sprite(sandalX, 260, 4, SPR.lars, CM.lars);
+
+  // --- Sandal's live speech bubble (rotating annoying lines) ---
+  const peeks = [
+    'got a sec? 🙂',
+    'quick Q!',
+    'just checking in!',
+    '...',
+    'how\'s that doc?',
+    'circling back 🙃',
+    'aligned?',
+    'no rush :)',
+    'real quick?',
+    'small flag 🚩',
+  ];
+  const pi = Math.floor(performance.now()/2200) % peeks.length;
+  const peek = peeks[pi];
+  ctx.font = 'bold 12px "Courier New"';
+  const tw = ctx.measureText(peek).width;
+  const bx = sandalX + 56, by = 232;
+  // bubble box
+  px(bx - 6, by - 16, tw + 16, 3, '#1a0a20');
+  px(bx - 6, by + 8, tw + 16, 3, '#1a0a20');
+  px(bx - 6, by - 14, 3, 22, '#1a0a20');
+  px(bx + tw + 7, by - 14, 3, 22, '#1a0a20');
+  px(bx - 3, by - 13, tw + 10, 20, '#ffffff');
+  // tail pointing to Sandal
+  px(bx - 2, by + 8, 4, 3, '#1a0a20');
+  px(bx - 4, by + 11, 8, 3, '#1a0a20');
+  px(bx - 3, by + 8, 6, 3, '#ffffff');
+  ctx.fillStyle = '#1a0a20';
+  ctx.fillText(peek, bx, by);
+
+  drawVignette();
+}
+
+// (duplicate drawCorpOffice removed)
+
+// ==================================================
+// UI HELPERS
+// ==================================================
+function setDialogue(who, text) {
+  if (who) {
+    dialogue.innerHTML = '<span class="who">' + who + ':</span> ' + text;
+  } else {
+    dialogue.innerHTML = text;
+  }
+}
+function clearActions() { actions.innerHTML = ''; }
+function addButton(label, cls, onClick) {
+  const b = document.createElement('button');
+  b.className = 'btn ' + (cls || '');
+  b.textContent = label;
+  b.onclick = onClick;
+  actions.appendChild(b);
+  return b;
+}
+
+const clockPill = document.getElementById('clock-pill');
+function updateHUD() {
+  dayPill.textContent = (DAYS_OF_WEEK[G.day - 1] || 'WEEKEND') + ' ' + G.day + '/5';
+  moneyPill.textContent = '$' + Math.round(G.money) + ' / $' + G.goal;
+  if (G.state === 'work') {
+    const remaining = Math.max(0, G.workDuration - G.workTime);
+    // Clock shows work day remaining — 45s game = "8 hour" workday
+    const workHoursTotal = 8;
+    const elapsedHours = (G.workTime / G.workDuration) * workHoursTotal;
+    const h = 9 + Math.floor(elapsedHours);
+    const m = Math.floor((elapsedHours % 1) * 60);
+    clockPill.textContent = '⏱ ' + (h < 10 ? '0'+h : h) + ':' + (m < 10 ? '0'+m : m) + '  (' + Math.ceil(remaining) + 's)';
+    clockPill.style.color = remaining < 10 ? '#ff6b9d' : '#f5d5e0';
+  } else if (G.state === 'bedtime') {
+    clockPill.textContent = '⏱ 23:47';
+    clockPill.style.color = '#f5d5e0';
+  } else if (G.state === 'morning') {
+    clockPill.textContent = '⏱ 07:14';
+    clockPill.style.color = '#f5d5e0';
+  } else {
+    clockPill.textContent = '⏱ --:--';
+    clockPill.style.color = '#f5d5e0';
+  }
+  const scenes = {
+    morning: 'BEDROOM',
+    choice: 'COMMUTE',
+    work: G.workplace === 'home' ? 'HOME OFFICE' : 'CORP HQ',
+    evening: 'EVENING',
+    win: 'BEACH',
+    title: '',
+  };
+  scenePill.textContent = scenes[G.state] || '';
+
+  document.querySelector('#focus-bar .fill').style.width = Math.max(0, Math.min(100, G.focus)) + '%';
+  document.querySelector('#fun-bar .fill').style.width = Math.max(0, Math.min(100, G.fun)) + '%';
+  document.querySelector('#boss-bar .fill').style.width = Math.max(0, Math.min(100, G.boss)) + '%';
+}
+
+// ==================================================
+// MORNING: CAT VOMIT HUNT
+// ==================================================
+// Random vomit spot — anywhere visible (NEVER under the dialogue box at bottom)
+// Safe zone: y between 330 and 478 (dialogue box starts around y=490)
+function randomVomitSpot() {
+  const r = Math.random();
+  let x, y, name;
+  if (r < 0.20) {
+    // on the bed
+    x = 390 + Math.random() * 140;
+    y = 340 + Math.random() * 20;
+    name = 'on the bed';
+  } else if (r < 0.50) {
+    // on the oval rug
+    x = 300 + Math.random() * 300;
+    y = 470 + Math.random() * 6;
+    name = 'on the rug';
+  } else {
+    // elsewhere on the floor (but above dialogue box)
+    // pick either left or right side to avoid bed
+    if (Math.random() < 0.5) {
+      x = 130 + Math.random() * 180;  // left side
+    } else {
+      x = 570 + Math.random() * 160;  // right side
+    }
+    y = 420 + Math.random() * 55;     // floor area, above dialogue
+    name = ['by the wardrobe','near the dresser','in the middle of the floor','next to the lamp','right where you\'d step','under a sock'][Math.floor(Math.random()*6)];
+  }
+  return { x: Math.round(x), y: Math.round(y), name };
+}
+
+function startMorning() {
+  G.state = 'morning';
+  ensureAudio();
+  G.vomitSpot = randomVomitSpot();
+  G.vomitCleaned = false;
+  G.cat = { x: 200, y: 440, walking: true, vomiting: false };
+  statsBar.classList.add('hidden');
+  clearActions();
+  const wakeLines = [
+    '*hork* *hork* HRRRK—',
+    'MRRROW. HRK. HRRRK.',
+    '*gagging noises at 6:47am*',
+    'HRRRRK (a sound like a sink drain crying)',
+  ];
+  setDialogue('KINU', wakeLines[Math.floor(Math.random()*wakeLines.length)]);
+
+  // Cat walks to vomit spot then vomits
+  let t = 0;
+  const sx = G.cat.x, sy = G.cat.y;
+  const tx = G.vomitSpot.x - 24;
+  const ty = G.vomitSpot.y - 24;
+  const walk = setInterval(() => {
+    t += 0.05;
+    if (t >= 1) {
+      clearInterval(walk);
+      G.cat.x = tx; G.cat.y = ty;
+      G.cat.walking = false;
+      G.cat.vomiting = true;
+      sfx('retch');
+      setDialogue('KINU', 'HRRRRRRRK... *splat*');
+      setTimeout(() => {
+        G.cat.vomiting = false;
+        // Cat wanders away
+        G.cat.walking = true;
+        const runT = setInterval(() => {
+          G.cat.x += 6;
+          if (G.cat.x > 760) {
+            clearInterval(runT);
+            G.cat.walking = false;
+            G.cat.x = 40; G.cat.y = 520;
+            const wakeUpLines = [
+              'KINU. I feed you the $40 salmon pâté. Why.<br><i>(Click the puddle to clean it.)</i>',
+              'I briefly consider putting her in a cardboard box addressed to Sweden.<br>I would never. Click the mess.',
+              'Every morning. Every single morning.<br>Find it before it seeps into the rug (again).',
+              'She did this ON PURPOSE because I closed the bedroom door last night.<br>Locate the crime scene.',
+              'I want to cry but I also have a 9:30 standup. Click the vom.',
+            ];
+            setDialogue('ZHENG', wakeUpLines[Math.floor(Math.random()*wakeUpLines.length)]);
+            enableVomitClick();
+          }
+        }, 40);
+      }, 1400);
+      return;
+    }
+    G.cat.x = sx + (tx - sx) * t;
+    G.cat.y = sy + (ty - sy) * t;
+  }, 40);
+}
+
+function enableVomitClick() {
+  canvas.onclick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (W / rect.width);
+    const y = (e.clientY - rect.top) * (H / rect.height);
+    const dx = x - G.vomitSpot.x;
+    const dy = y - G.vomitSpot.y;
+    if (Math.hypot(dx, dy) < 42) {
+      G.vomitCleaned = true;
+      canvas.onclick = null;
+      let line;
+      if (G.vomitSpot.name === 'on the bed') {
+        const bedLines = [
+          'ON. THE. BED. The SHEETS. I JUST did laundry. KINU.<br>This is a war crime.',
+          'On my pillow. ON MY PILLOW. I\'m going to need a moment.<br>I am going to need several moments.',
+          'She crawled UP onto the duvet to vomit. The DUVET. It was €140.<br>I want to scream.',
+          'Sheets off. Mattress check. Protector stained.<br>I am going to work without speaking to her today.',
+        ];
+        line = '<span style="color:#ff3d7f;font-weight:bold;">ON THE BED.</span> ' + bedLines[Math.floor(Math.random()*bedLines.length)];
+        showSpiralOverlay('BED.', 'on the actual bed.', 1800);
+      } else {
+        const doneLines = [
+          'Cleaned. Paper towels: 4. Will to live: 2.<br>Home or office?',
+          'Gone. I love her. I would also sell her.<br>Home or office today?',
+          'Dealt with. I smell like enzyme spray.<br>Where are we suffering from today?',
+          '"'+ G.vomitSpot.name + '" today. Classic.<br>Home or office?',
+        ];
+        line = doneLines[Math.floor(Math.random()*doneLines.length)];
+      }
+      setDialogue('ZHENG', line);
+      setTimeout(showCommuteChoice, G.vomitSpot.name === 'on the bed' ? 2200 : 900);
+    } else {
+      const missLines = [
+        'Nothing here. Getting colder.',
+        'Not it. My bare foot is going to find it first. I know it.',
+        'Clean. Keep looking. He has favorite spots, you know this.',
+        'No vom. Where did the little gremlin put it.',
+      ];
+      setDialogue('ZHENG', missLines[Math.floor(Math.random()*missLines.length)]);
+    }
+  };
+}
+
+// ==================================================
+// COMMUTE CHOICE
+// ==================================================
+function showCommuteChoice() {
+  G.state = 'choice';
+  updateHUD();
+  clearActions();
+  canvas.onclick = null;
+  const lines = [
+    'Home in boxers & a hoodie... or the cubicle where Sandal lives?',
+    'Do I want Kinu staring at me all day, or Sandal "just circling back :)" every 20 minutes?',
+    'Pajamas and poor decisions, or the fluorescent prison?',
+  ];
+  setDialogue('ZHENG', lines[Math.floor(Math.random()*lines.length)]);
+  addButton('WORK FROM HOME', 'alt', () => startWork('home'));
+  addButton('GO TO THE OFFICE', 'warn', () => startWork('office'));
+}
+
+// ==================================================
+// WORK PHASE
+// ==================================================
+function startWork(where) {
+  G.state = 'work';
+  G.workplace = where;
+  G.focus = 60;
+  G.fun = 10;
+  G.boss = where === 'office' ? 10 : 0;
+  G.workTime = 0;
+  G.caughtToday = 0;
+  G.earnedToday = 0;
+  G.distractionTimer = 2.5;
+  G.bossTimer = where === 'office' ? 8 : 14;
+  G.creativeCooldown = 0;
+  G.burnout = 0;
+  G.lowFunTime = 0;
+  G.burnoutFiredToday = false;
+  G.homeVomit = null;
+  G.homeVomitCount = 0;
+  G._vomitScheduled1 = false;
+  G._vomitScheduled2 = false;
+  G._zeroFocusTime = 0;
+  G._selfDistractTimer = 5;
+  G._hrFiredToday = false;
+  // Canvas click handler — clean Kinu's vomit during home work
+  canvas.onclick = (e) => {
+    if (G.state !== 'work' || !G.homeVomit) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (W / rect.width);
+    const cy = (e.clientY - rect.top) * (H / rect.height);
+    const dx = cx - G.homeVomit.x, dy = cy - G.homeVomit.y;
+    if (Math.hypot(dx, dy) < 46) {
+      G.homeVomit = null;
+      sfx('coin');
+      showBubble('phew', 1200);
+      setDialogue('ZHENG', 'Cleaned. Paper towels: 6. Enzyme spray: depleted. I love her I swear.');
+    }
+  };
+  statsBar.classList.remove('hidden');
+  clearActions();
+  clearDistractions();
+
+  const openerLines = where === 'home'
+    ? [
+        'Logged in. VPN connected. Pants optional.',
+        'Camera off. Kinu on my lap. Let\'s pretend to work.',
+        'Slack status: 🟢 Active. Reality: horizontal.',
+      ]
+    : [
+        'Badged in. Sandal already made eye contact. Hell has begun.',
+        'The open office smells like stress and Nespresso.',
+        'Cubicle life. 40 sq ft of sadness.',
+      ];
+  setDialogue('ZHENG', openerLines[Math.floor(Math.random()*openerLines.length)]);
+
+  // Action buttons
+  const focusBtn = addButton('FOCUS', 'alt', () => {
+    if (G.spiralLock > 0) {
+      setDialogue('ZHENG', 'I CAN\'T. I literally can\'t. (' + Math.ceil(G.spiralLock) + 's)');
+      showBubble('i CAN\'T', 1200);
+      return;
+    }
+    if (G.fun < 1) {
+      setDialogue('ZHENG', 'I\'ve had zero fun today. My brain is a wet sock. I cannot focus on anything.');
+      showBubble('no joy', 1400);
+      return;
+    }
+    G.focus = Math.min(100, G.focus + 8);
+    G.fun = Math.max(0, G.fun - 3);
+    G.boss = Math.max(0, G.boss - 5);
+    G._focusBoostTime = 1.2; // ~1.2 seconds of "actively focusing" — suspicion drops
+    pulse('#6ad4c4');
+    earnTick(14);
+    sfx('coin');
+    if (Math.random() < 0.3) {
+      const focusLines = [
+        'Finished a Jira ticket. Felt nothing.',
+        'Renamed a file. Counts as work.',
+        'Actually read the PRD. I am a god.',
+        'Wrote an email. Deleted the emojis. Added them back.',
+        'Wrote the word "furthermore" in a doc. Big day.',
+        'Closed 3 tabs. Reopened 5. Net: -2.',
+        'Joined a meeting with camera off. Muted. Thriving.',
+        'Commented "LGTM 🚀" on a PR I did not read.',
+      ];
+      setDialogue('ZHENG', focusLines[Math.floor(Math.random()*focusLines.length)]);
+    }
+  });
+  focusBtn.title = 'Actually do work. Earn $, drop suspicion, lose a bit of fun.';
+  const creativeBtn = addButton('THIRSTY REELS', 'warn', () => {
+    if (G.creativeCooldown > 0) {
+      setDialogue('ZHENG', 'My phone is charging. Cooldown: ' + Math.ceil(G.creativeCooldown) + 's.');
+      return;
+    }
+    G.creativeCooldown = 5;
+    G.fun = Math.min(100, G.fun + 35);
+    G.focus = Math.max(0, G.focus - 8);
+    G.boss = Math.min(100, G.boss + 22);
+    const reelLines = [
+      '"boys in hi-vis vests doing manual labor" — 47 seconds. Felt something.',
+      'A shirtless Greek fisherman mending a net. Saved. Shared. Saved again.',
+      'Gay men of Instagram showing their "morning routines" (shirtless, always).',
+      'Two twinks in a vineyard. No narrative. Zheng watches 4 times.',
+      'The algorithm KNOWS. A guy with forearms is doing something. 8 reels in a row.',
+      'A father of 3 in a Henley is explaining sourdough. Zheng is unwell.',
+      'Matcha-boy from the café on TikTok. He\'s in PARIS now??? Saves his location.',
+      'A dad-bod chef is kneading bread in slow motion. Zheng needs to sit down.',
+    ];
+    setDialogue('ZHENG', reelLines[Math.floor(Math.random()*reelLines.length)]);
+    showBubble('🥵', 1600);
+    pulse('#ff6b9d');
+    sfx('pop');
+  });
+  creativeBtn.title = 'Watch thirsty reels. Fun up. Focus down. Boss notices.';
+  addButton('SPANK HIM', 'spank', () => {
+    if (G.spankCooldown > 0) {
+      setDialogue('ZHENG', '...ow. Easy. Cooldown: ' + Math.ceil(G.spankCooldown) + 's.');
+      return;
+    }
+    G.spankCooldown = 4;
+    doSpank();
+  });
+  addButton('TAKE A BREAK', '', () => {
+    G.fun = Math.max(0, G.fun - 12);
+    G.focus = Math.min(100, G.focus + 18);
+    G.boss = Math.max(0, G.boss - 5);
+    const breakLines = [
+      'Stretched. Watered Kinu. Cried a little. Reset.',
+      'Stood up. Remembered I have a body. Sat down.',
+      'Made a matcha. It\'s the 4th one. Heart is fine probably.',
+      'Scrolled Notes app. Found a poem from 2019. Closed it.',
+    ];
+    setDialogue('ZHENG', breakLines[Math.floor(Math.random()*breakLines.length)]);
+  });
+
+  G.running = true;
+  G.lastTs = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function earnTick(amount) {
+  // Modulated by focus — 50% faster baseline
+  const mult = ((G.focus / 100) * 1.2 + 0.2) * 1.5;
+  const earned = Math.floor(amount * mult);
+  G.earnedToday += earned;
+  G.money += earned;
+}
+
+function pulse(color) {
+  // Visual flash
+  canvas.style.boxShadow = '0 0 30px ' + color;
+  setTimeout(() => canvas.style.boxShadow = '', 200);
+}
+
+function doSpank() {
+  const slacking = G.fun > 55 || G.focus < 40;
+  G.spankCount++;
+  G.spankShake = 1;
+  sfx('spank');
+  showBubble(slacking ? 'OW!' : 'hey?', 1200);
+
+  // SMACK overlay near Zheng
+  const smack = document.getElementById('smack');
+  // Position near the desk (roughly where Zheng is)
+  const offsetX = 300 + Math.random()*120;
+  const offsetY = 240 + Math.random()*80;
+  smack.style.left = offsetX + 'px';
+  smack.style.top  = offsetY + 'px';
+  const smackWords = ['SMACK!', 'WHAP!', 'SPANK!', 'POW!', 'THWACK!', '*SLAP*'];
+  smack.textContent = smackWords[Math.floor(Math.random()*smackWords.length)];
+  smack.classList.remove('show');
+  void smack.offsetWidth; // reflow
+  smack.classList.add('show');
+  setTimeout(() => smack.classList.remove('show'), 500);
+
+  // Shake the whole game
+  const g = document.getElementById('game');
+  g.classList.remove('shaking');
+  void g.offsetWidth;
+  g.classList.add('shaking');
+  setTimeout(() => g.classList.remove('shaking'), 400);
+
+  // Close any open distractions (he snapped out of it)
+  clearDistractions();
+
+  if (slacking) {
+    // Deserved. Big focus recovery, money tick.
+    G.focus = Math.min(100, G.focus + 25);
+    G.fun = Math.max(0, G.fun - 30);
+    G.boss = Math.max(0, G.boss - 15);
+    earnTick(22);
+    const lines = [
+      '"OW. OKAY. BACK TO JIRA. BACK TO JIRA."',
+      '"yes sir. committing the PR. committing the PR right now."',
+      '"fine. FINE. I\'ll read the PRD. god."',
+      '"okay I\'m closing Grindr. I\'m closing Grindr! look!"',
+      '"you\'re right, you\'re right, I\'m logging off the situationship chat."',
+      '"noted. opening Linear. opening Linear, boss."',
+    ];
+    setDialogue('ZHENG', lines[Math.floor(Math.random()*lines.length)]);
+  } else {
+    // Unprovoked. Small effect. Zheng is into it but confused.
+    G.focus = Math.min(100, G.focus + 8);
+    G.fun = Math.min(100, G.fun + 6);
+    const lines = [
+      '"...for what? I was working."',
+      '"thank you? I think?"',
+      '"okay that one was just for fun."',
+      '"hello sir. that was unprompted. I liked it."',
+      '"I wasn\'t even slacking. but ok."',
+    ];
+    setDialogue('ZHENG', lines[Math.floor(Math.random()*lines.length)]);
+  }
+
+  if (G.spankCount === 5) {
+    setTimeout(() => setDialogue('ZHENG', 'You\'ve hit me 5 times. I\'m not going to say I don\'t like it.'), 900);
+  } else if (G.spankCount === 15) {
+    setTimeout(() => setDialogue('ZHENG', 'At this point this is a lifestyle.'), 900);
+  }
+
+  pulse('#ff3d7f');
+}
+
+// ---------- Distractions ----------
+const DISTRACTIONS = [
+  { id: 'grindr_torso', label: 'GRINDR\n🔥 torso at 9am', color: '#ff8a3d', fun: 18, focus: -16, boss: 8,
+    lines: [
+      'Headless torso, 180m away. Bio: "masc only". Zheng is 5\'6" and moisturizes. Not for him.',
+      'A 42yo labeled "discreet" sent "hi asian". Zheng blocks, spirals, reopens app, blocks again.',
+      '"into twinks?" — sent to Zheng by someone 0m away. He slowly looks up. Someone in the building.',
+      'Sent nudes. Got "cute 🙂" back. He is going to die.',
+    ] },
+  { id: 'grindr_read', label: 'GRINDR\nread receipts', color: '#ff4d7d', fun: 12, focus: -20, boss: 6,
+    lines: [
+      'Markus (the Berlin twink from April) read his message 34 minutes ago. Still nothing. Zheng\'s cortisol: spiking.',
+      'Opens the chat. Closes it. Opens it. Types "hey". Deletes. Types "hey :)". Sends. Immediate regret.',
+      'He has now rewritten the same 4-word message 6 times. 23 minutes gone.',
+    ] },
+  { id: 'girlies', label: 'ANNA/SUSAN/JOY\n💅 Malaga plans', color: '#6ad4c4', fun: 14, focus: -10, boss: 4,
+    lines: [
+      'Anna: "babe did you book the flight?" Zheng: *looks at bank balance* *closes app*',
+      'Susan sent a 4-min voice note about a guy at brunch. It is REQUIRED listening.',
+      'Joy is already comparing bikinis in the group chat. Zheng has not started packing. Or earning.',
+      'Group chat renamed to "MALAGA OR DIE" for the 4th time this month.',
+      'Anna: "if you bail I\'m never speaking to you again 💕" Zheng: *cold sweat*',
+    ] },
+  { id: 'grindr_bjorn', label: 'GRINDR\n💬 Björn, 1.2km', color: '#c89aff', fun: 16, focus: -18, boss: 5,
+    lines: [
+      'Björn, 34, Swedish, bio "no dramas": sent "yo" at 10:47am. Zheng stares at it.',
+      'Björn has 8 shirtless photos in the same bathroom. Same angle. Impressive commitment.',
+      'Björn: "pic?" Zheng sends a cat. Björn unmatches.',
+    ] },
+  { id: 'grindr_taro', label: 'GRINDR\n🍵 Taro, 600m', color: '#ff8a3d', fun: 14, focus: -14, boss: 4,
+    lines: [
+      'Taro, 27, visiting from Osaka, asks if Zheng knows good ramen. He doesn\'t. He lies.',
+      'Taro\'s profile is a single photo of a teapot. Zheng is obsessed.',
+      'Taro: "wanna grab coffee?" Zheng: *internal debate 14 min* → "maybe next week 🫣"',
+    ] },
+  { id: 'grindr_pedro', label: 'GRINDR\n🌶 Pedro, 400m', color: '#ffd166', fun: 18, focus: -16, boss: 6,
+    lines: [
+      'Pedro, 29, Madrid, bio "fun / discreet": sent four photos in 30 seconds.',
+      'Pedro: "u host?" Zheng: *looks at laundry pile on the chair* — "not today babe"',
+      'Pedro is "WFH" 4 blocks away. Zheng gives this information weight it does not deserve.',
+    ] },
+  { id: 'game', label: 'STEAM\nBalatro', color: '#ffd166', fun: 20, focus: -18, boss: 6,
+    lines: [
+      'One more run. ONE MORE RUN. It is 2:43am in-game time. His actual clock says 10:22am.',
+      'Got the Blueprint Joker. Sandal Slacks him. Ignored.',
+      'Lost to the boss blind. Rage-quits. Opens it again. Second run: worse.',
+    ] },
+  { id: 'tiktok', label: 'TIKTOK\ndoomscroll', color: '#ff6b9d', fun: 16, focus: -14, boss: 5,
+    lines: [
+      'Algorithm knows. He has watched 14 videos of Filipino grandmas cooking. He\'s crying now.',
+      'A gay couple renovating a farmhouse in Portugal. Zheng is plotting his escape from tech.',
+      '22 minutes on "men in hi-vis vests doing manual labor". Research. For a script. He swears.',
+    ] },
+  { id: 'twitter', label: 'X/TWITTER\n🐦‍⬛ drama', color: '#7acfe0', fun: 10, focus: -12, boss: 4,
+    lines: [
+      'A discourse. He doesn\'t know what it\'s about but he has Opinions.',
+      'Someone subtweeted him and he\'s NOT crazy for knowing. He drafted 4 replies. Sent none.',
+      'Gay Twitter is fighting. Zheng is spectating with popcorn emoji energy.',
+    ] },
+  { id: 'porn', label: 'INCOGNITO\n👀 tab', color: '#9a3a5a', fun: 22, focus: -22, boss: 10,
+    lines: [
+      'It\'s 10:17am. He has a webcam light on. He hopes Sandal is not screen sharing.',
+      'Closed it. Opened it. Closed it. Came back for the plot.',
+      '"just a peek". It was not just a peek. 38 minutes have passed.',
+    ] },
+  { id: 'bubbletea', label: 'UBER EATS\n🧋 4th one', color: '#a5ebe0', fun: 8, focus: -6, boss: 2,
+    lines: [
+      'Fourth oat milk matcha. He tells himself it has protein (it does not).',
+      'Ordered brown sugar boba "as a treat". It is 11am. He has not eaten anything else.',
+      '$11 delivery fee on a $6 drink. He pays. He always pays.',
+    ] },
+  { id: 'mom', label: 'TEXT\n妈妈 📱', color: '#ffb8d4', fun: 4, focus: -14, boss: 2,
+    lines: [
+      'Mom: "你吃了吗" ("have you eaten"). He hasn\'t. He lies.',
+      'Mom sent a WeChat voice note at 3am Beijing time. It\'s 7 minutes long. About a cousin.',
+      'She asked when he\'s bringing home a "friend". He has not come out to her. He never will (?).',
+      'Mom forwarded a conspiracy article. About 5G. He sends a heart.',
+    ] },
+  { id: 'substack', label: 'SUBSTACK\n📰 "must-read"', color: '#f59050', fun: 12, focus: -14, boss: 3,
+    lines: [
+      'A 7000-word essay about why millennials are lonely. He is having a moment.',
+      'Some guy in Brooklyn has opinions about "the discourse". Zheng is reading all 14 paragraphs.',
+      'Reads three "how to be rich" newsletters. Is not rich. Closes them. Feels worse.',
+    ] },
+  { id: 'vinted', label: 'VINTED\n🛍️ bidding', color: '#6adfb8', fun: 14, focus: -16, boss: 5,
+    lines: [
+      'A vintage Raf Simons bomber. 3 hours left. Current bid: €280. He is sweating.',
+      'Bought a "new with tags" silk shirt from a 19yo in Prague. Cool cool cool.',
+      'Counter-offered €90 on a Margiela tee. Was declined. Spiraling.',
+      'His Vinted has 47 items listed. He has sold 2. In 8 months.',
+    ] },
+  { id: 'spotify', label: 'SPOTIFY\n🎧 new playlist', color: '#4add80', fun: 16, focus: -12, boss: 4,
+    lines: [
+      'Made a 43-song playlist called "things to cry to in the shower". Adds one more song.',
+      'Found a 2009 Crystal Castles b-side. Lies down.',
+      'Listens to the same 1-minute TikTok remix on loop for 20 minutes. Productivity: ??',
+    ] },
+  { id: 'letterboxd', label: 'LETTERBOXD\n🎬 log a film', color: '#ff8a3d', fun: 10, focus: -10, boss: 3,
+    lines: [
+      'Writes a 4-sentence review of a Tsai Ming-liang film. Two people like it. Drug.',
+      'His "watchlist" has 337 films. He watches the same 3 comfort films on rotation.',
+      'Rated Call Me By Your Name three stars again. Comments will be unhinged.',
+    ] },
+  { id: 'kinuslack', label: 'KINU-AS-SLACK\n😾 meow', color: '#c87840', fun: 12, focus: -10, boss: 2,
+    lines: [
+      'Kinu is standing on the laptop. Slack is now just the letter ㎖ repeated 400 times.',
+      'Kinu typed "hbbbbbbbbbbbbbh" in a comment thread. Sandal has reacted 👀.',
+      'Kinu accidentally unmuted him in a 14-person call. Everyone heard her snoring.',
+    ] },
+  { id: 'glassdoor', label: 'GLASSDOOR\n🔍 new role', color: '#7aa0d8', fun: 10, focus: -16, boss: 6,
+    lines: [
+      'There\'s a "Senior something something" role at a competitor. 40% more money. He drafts a CV. Saves draft. Doesn\'t send.',
+      'Googles "can I quit without a job lined up". Closes tab. Cries. Continues.',
+      'Reads 22 reviews of his own company. 2.6 stars. "Nice ping pong table." He doesn\'t play ping pong.',
+    ] },
+  { id: 'airbnb', label: 'AIRBNB\n🏡 Malaga plans', color: '#ff5a5f', fun: 18, focus: -14, boss: 4,
+    lines: [
+      'Spends 40 min looking at apartments in Malaga. 14 saved. Will book 0.',
+      'Opens Google Flights in 6 tabs. Prices go up by €30 every refresh. He refreshes anyway.',
+      'Writes a whole itinerary in Notes. Has not booked anything. It\'s in 18 days.',
+    ] },
+  { id: 'notes', label: 'NOTES APP\n📝 genius idea', color: '#e8d0a0', fun: 8, focus: -8, boss: 2,
+    lines: [
+      'Wrote "gay pilates studio — BUT" and saved. Never revisits the thought.',
+      'Notes app entry from 2022: "what if furniture but for guys". No context. Chilling.',
+      'Drafts the first paragraph of the memoir. Deletes it. Makes a sandwich.',
+    ] },
+  { id: 'skincare', label: 'SKINCARE\n✨ The Ordinary', color: '#d0e8e0', fun: 10, focus: -10, boss: 3,
+    lines: [
+      'Reads 14 minutes of Reddit about niacinamide. Buys two more bottles he doesn\'t need.',
+      'Looks in the camera. Pokes his cheek. Looks again. Is this collagen loss. He\'s 32.',
+      'Sheet mask. On a work call. Camera stays off, obviously.',
+    ] },
+  { id: 'doordash', label: 'WOLT\n🍜 ramen run', color: '#ffd166', fun: 12, focus: -8, boss: 2,
+    lines: [
+      'Orders ramen for lunch. "Add gyoza as an extra". Also spicy miso. €34 total. He does not flinch.',
+      'Orders a second iced oat latte. The driver says "again?" in the app. Zheng blocks him in his mind.',
+      'Ordered sushi at 11:02am. Is not ashamed.',
+    ] },
+  { id: 'hookup', label: 'HOOKUP\n💬 from last week', color: '#8a3d60', fun: 14, focus: -18, boss: 8,
+    lines: [
+      'The guy from last Thursday: "hey u free saturday?" Zheng: *40 minute internal debate*',
+      'He rereads the entire chat log from September. For research.',
+      'Ghost opens the message. Does not reply. Lives rent free in Zheng\'s cortex.',
+    ] },
+  { id: 'pinterest', label: 'PINTEREST\n📌 mood board', color: '#e8405a', fun: 14, focus: -12, boss: 3,
+    lines: [
+      'Starts a mood board called "autumn heavenly bodies". Saves 68 images in 9 minutes.',
+      'Pins 40 photos of minimalist Swedish apartments. His apartment is chaos.',
+      'Researches "what jacket is Timothée Chalamet wearing". He needs this jacket.',
+    ] },
+  { id: 'wechat', label: 'WECHAT\n💬 uncle money', color: '#7be04a', fun: 6, focus: -12, boss: 3,
+    lines: [
+      'Uncle sent ¥88 red packet "for luck". Zheng feels guilty all day.',
+      'Family group chat has 347 unread messages. He reads 4. Gets anxious.',
+      'Cousin posted a baby photo. Zheng: "so cute ❤️". Privately: panic.',
+    ] },
+  { id: 'therapist', label: 'THERAPIST\n📅 reschedule', color: '#b894e8', fun: 4, focus: -10, boss: 2,
+    lines: [
+      'Reschedules therapy for the 3rd week in a row. "Work is crazy." Work is not crazy.',
+      'Reads his therapist\'s email from 2 weeks ago. "How are you feeling." Closes it.',
+      'Googles "am I the problem". Top result: yes.',
+    ] },
+  { id: 'mirror', label: 'STARES\n🪞 into the void', color: '#b8b8c8', fun: 2, focus: -16, boss: 4,
+    lines: [
+      'Catches his reflection in the black monitor. Doesn\'t move for 40 seconds.',
+      'Thinks about his ex. Closes his eyes. Opens them. Still here.',
+      'Wonders if he\'s a real person. Decides: unclear.',
+    ] },
+  { id: 'reddit', label: 'REDDIT\n👀 r/askgaybros', color: '#ff4500', fun: 14, focus: -14, boss: 5,
+    lines: [
+      'A thread titled "am I the problem in my situationship" has 847 comments. He reads 300.',
+      'r/malefashionadvice. Someone asks if a fit is okay. It\'s fine. Zheng comments anyway.',
+      'r/Abyssinian. A cat that looks exactly like Kinu. He cries.',
+    ] },
+  { id: 'strava', label: 'STRAVA\n🏃 guilt', color: '#fc5200', fun: 4, focus: -8, boss: 2,
+    lines: [
+      'Hasn\'t logged a run in 23 days. Gym is €60/month. He pays it. He will "start Monday".',
+      '"Kudos" from a guy he matched with in 2021. Opens the profile. He got hotter. Cool.',
+    ] },
+  { id: 'tinder', label: 'TINDER\n💘 a swipe spiral', color: '#ff6b9d', fun: 12, focus: -14, boss: 5,
+    lines: [
+      'Matches with a guy whose bio is just "🍷🧠🖤". Has no idea what to say. Unmatches 3 days later.',
+      '"We matched 7 months ago, how\'s it going?" He sends this. Gets read. Nothing back. Normal.',
+      'Sees his personal trainer on the app. Panics. Super-likes by accident.',
+    ] },
+  { id: 'email', label: 'GMAIL\n📨 unsubscribe', color: '#d0402e', fun: 6, focus: -6, boss: 1,
+    lines: [
+      'Unsubscribes from 14 newsletters. Subscribes to 3 new ones. Equilibrium.',
+      'Inbox: 24,847 unread. He archives one email. Progress.',
+      'Finds a 2019 email from his ex\'s mom. Does not open. Cannot move.',
+    ] },
+  { id: 'nap', label: 'NAP\n😴 "5 min"', color: '#6a78a8', fun: 28, focus: -20, boss: 6, ctx: 'home',
+    lines: [
+      'Sets a 5-min timer. Wakes up 47 minutes later. His face has a pillow-mark.',
+      'Horizontal on the floor. Kinu on his chest. This is a CEO move actually.',
+      'Dreamed about Sandal in a lifeguard uniform. Concerning. Moving on.',
+    ] },
+
+  // =========================================================
+  // ~100 MORE — tagged for home / office / both
+  // =========================================================
+
+  // --- OFFICE-specific (corporate hell) ---
+  { id: 'slack_coworker', label: 'SLACK\n@jules\'s ping', color: '#4a154b', fun: 16, focus: -14, boss: 5, ctx: 'office', lines: [
+    'Jules DMs: "can i vent for a sec 👀" — Zheng: "omg please"',
+    'Jules says Sandal did the THING again. They spend 18 min writing an airtight rant doc.',
+    'Jules slacks a meme. It\'s about corporate gaslighting. Zheng saves it.',
+  ]},
+  { id: 'teams_invite', label: 'TEAMS\n📅 30min sync', color: '#5059c9', fun: 4, focus: -14, boss: 7, ctx: 'office', lines: [
+    '"Just a 30-min quick chat, no prep needed" (always prep needed).',
+    'Calendar invite has no agenda. Eight attendees. It\'s in 4 minutes.',
+    'Sandal sent it from his phone with "❤️" in the subject.',
+  ]},
+  { id: 'figma_comment', label: 'FIGMA\n💬 design nit', color: '#a259ff', fun: 8, focus: -12, boss: 4, ctx: 'office', lines: [
+    'A designer left 14 "small feedback" comments. One of them is 3 paragraphs.',
+    'Comment: "can we align this better 🙂". The thing is aligned. He realigns it.',
+  ]},
+  { id: 'jira_assigned', label: 'JIRA\n🎟 assigned', color: '#0052cc', fun: 2, focus: -8, boss: 2, ctx: 'office', lines: [
+    'Sandal assigned him a P0 with the description "let\'s chat". That\'s it. P0.',
+    'Ticket auto-assigned from a script. He has no idea what it means.',
+  ]},
+  { id: 'allhands', label: 'ALL-HANDS\n📢 Q-vision', color: '#e8e8e8', fun: 6, focus: -16, boss: 5, ctx: 'office', lines: [
+    'CEO is saying "we\'re a family". Engineering is crying silently.',
+    'All-hands slide: "FY ambition — we\'re crushing it!!!" Layoffs announced 20 min later.',
+    'They\'re playing a hype video with drone shots. Of the office. It\'s one floor.',
+  ]},
+  { id: 'fluorescent', label: 'FLUORESCENT\n💡 flicker', color: '#f5f5dc', fun: 4, focus: -10, boss: 3, ctx: 'office', lines: [
+    'The one flickering light above Zheng has a rhythm. He\'s starting to harmonize with it.',
+    'He has a headache now. The migraine lives in the ballast.',
+  ]},
+  { id: 'coworker_snacks', label: 'KITCHEN\n🍪 free cookies', color: '#d0842a', fun: 16, focus: -10, boss: 4, ctx: 'office', lines: [
+    'Someone brought sourdough. Zheng ate 4 slices standing at the counter.',
+    'Free crackers. Free oat milk. His entire lunch budget: saved. Dignity: not.',
+    'There\'s a half-eaten Tupperware of tteokbokki in the fridge. Unlabeled. He reheats it.',
+  ]},
+  { id: 'elevator', label: 'ELEVATOR\n🛗 small talk', color: '#808080', fun: 6, focus: -8, boss: 3, ctx: 'office', lines: [
+    'The VP is in the elevator. Says "crushing it?" Zheng says "lol". It takes 9 floors.',
+    'HR is in the elevator. She says "love your shirt". He wants to melt into the wall.',
+  ]},
+  { id: 'printer_jam', label: 'PRINTER\n🖨 jammed', color: '#606060', fun: 10, focus: -10, boss: 3, ctx: 'office', lines: [
+    'Tries to print a 1-pager. 38 minutes of troubleshooting. IT says "have you tried turning it off and on again". He had.',
+    'Jammed paper has his personal health info on it. Yanks it out violently.',
+  ]},
+  { id: 'standup', label: 'STANDUP\n🎤 your turn', color: '#ff5a3d', fun: 4, focus: -14, boss: 6, ctx: 'office', lines: [
+    '"Yesterday I worked on the doc, today I\'ll continue the doc, no blockers." Same as yesterday.',
+    'Caught 3 min late. Sandal says "great to have you with us 🙂". Everyone heard it.',
+  ]},
+  { id: 'lunch_alone', label: 'LUNCH\n🥗 alone', color: '#8ab050', fun: 10, focus: -8, boss: 2, ctx: 'office', lines: [
+    'Sad desk salad. €14. Two tomatoes. Lettuce that was promised but never arrived.',
+    'Eats at his desk watching a French woman restore a chair on YouTube. Peaceful.',
+    'Canteen has "mystery lasagna". It\'s €9. He gets it. It IS a mystery.',
+  ]},
+  { id: 'bathroom_hide', label: 'TOILET\n🚽 phone break', color: '#b0d0d0', fun: 16, focus: -12, boss: 3, ctx: 'office', lines: [
+    'Hides in the accessible stall for 22 minutes. Scrolls. Feels better briefly.',
+    'Someone is crying in the next stall. He stays very still.',
+    'Writes a haiku in his Notes app. About Sandal. Deletes it.',
+  ]},
+  { id: 'notif_ding', label: 'OUTLOOK\n📬 FYI', color: '#0078d4', fun: 2, focus: -10, boss: 4, ctx: 'office', lines: [
+    'Sandal forwarded him an email with "FYI". No context. The email is from 2022.',
+    '"Per my last email" — he re-reads his last email. It didn\'t say anything.',
+  ]},
+  { id: 'perf_review', label: 'PERF REVIEW\n📋 self-eval', color: '#800020', fun: 2, focus: -12, boss: 5, ctx: 'office', lines: [
+    'Types "exceeded expectations" for 6 bullet points. Changes them to "met expectations". Back to exceeded. Back to met.',
+    'The prompt asks: "What is a failure you learned from?" He cries in the corporate prose.',
+  ]},
+  { id: 'onboarding', label: 'CONFLUENCE\n📘 training', color: '#003087', fun: 4, focus: -10, boss: 3, ctx: 'office', lines: [
+    'Assigned a "mandatory ethics module". 42 minutes. He presses next, next, next.',
+    'Passed the quiz by googling the answers. Did not learn ethics.',
+  ]},
+  { id: 'badge_reader', label: 'BADGE\n🪪 forgot it', color: '#404040', fun: 6, focus: -6, boss: 2, ctx: 'office', lines: [
+    'Had to tailgate in behind a VP. She noticed. Did not say anything. He will remember this forever.',
+    'Left it at home. Got a "temp visitor" badge that says GUEST. He is a 4-year tenure employee.',
+  ]},
+  { id: 'window_gaze', label: 'WINDOW\n☁️ gazing', color: '#88c0e0', fun: 14, focus: -16, boss: 4, ctx: 'office', lines: [
+    'Watches a cloud slowly move for 6 minutes. Genuinely happy.',
+    'Pigeon on the ledge. They make eye contact. Something passes between them.',
+    'Wonders if the person in the building opposite can see him. They can. They wave. He dies.',
+  ]},
+  { id: 'mixer', label: 'COMPANY MIXER\n🍷 after work', color: '#8a2040', fun: 18, focus: -18, boss: 6, ctx: 'office', lines: [
+    'Cheap prosecco. Expensive awkwardness. Sandal is giving a speech.',
+    'Got cornered by the head of Product. He said "growth mindset" four times.',
+  ]},
+  { id: 'desk_neighbour', label: 'DESK NEIGHBOR\n🗣 venting', color: '#d8a070', fun: 14, focus: -14, boss: 4, ctx: 'office', lines: [
+    'Marta from FP&A is telling him, in detail, about her divorce. He nods. He has a ticket due.',
+    'New guy keeps asking how to unmute. Zheng is the closest gay. He helps.',
+  ]},
+  { id: 'coffeebar', label: 'COFFEE BAR\n☕ 4th one', color: '#5a3820', fun: 10, focus: -6, boss: 2, ctx: 'office', lines: [
+    'Fourth cappuccino. Heart rate: elevated. Eye twitch: online.',
+    'The machine is broken. "Out of order since 9am 🙂" — a post-it. It is now 2pm.',
+  ]},
+
+  // --- HOME-specific ---
+  { id: 'doorbell', label: 'DOORBELL\n📦 amazon', color: '#ff9900', fun: 14, focus: -18, boss: 4, ctx: 'home', lines: [
+    'Three packages. He ordered one thing. One is for upstairs. One is from 2 weeks ago. One is mystery.',
+    'Missed the delivery by 8 seconds. Note says "couldn\'t reach you". He was on a call. He was HERE.',
+  ]},
+  { id: 'neighbor_drill', label: 'NEIGHBOR\n🔨 drilling', color: '#606060', fun: 2, focus: -20, boss: 4, ctx: 'home', lines: [
+    'The neighbor has been drilling for 40 minutes. What is he DOING. It\'s a rental.',
+    'Thuds from upstairs. Like someone moving a body. Probably just IKEA.',
+  ]},
+  { id: 'laundry_buzz', label: 'LAUNDRY\n🧺 done', color: '#4a80c8', fun: 8, focus: -10, boss: 2, ctx: 'home', lines: [
+    'Washer beeps. He ignores it. Smells mildew 6 hours later. Rewashes.',
+    'Puts the laundry on the "chair". We know the chair.',
+  ]},
+  { id: 'takeout', label: 'DELIVEROO\n🥡 at the door', color: '#00c8a7', fun: 18, focus: -12, boss: 3, ctx: 'home', lines: [
+    'Courier is outside. Zheng is on camera in a meeting. Mutes. Runs.',
+    'Forgot he ordered two meals. Eats them both. Does not regret.',
+    'The driver wanted to chat about his LinkedIn. Zheng nodded for 4 minutes.',
+  ]},
+  { id: 'kinu_lap', label: 'KINU\n🐈 on his chest', color: '#c87840', fun: 24, focus: -14, boss: 2, ctx: 'home', lines: [
+    'Kinu climbs onto him and starts making biscuits. He has not moved in 22 minutes. He will not.',
+    'Cannot reach the laptop. Not moving. This is his girlfriend now.',
+  ]},
+  { id: 'kinu_meow', label: 'KINU\n😾 DEMANDS', color: '#c87840', fun: 10, focus: -14, boss: 3, ctx: 'home', lines: [
+    'Standing by the food bowl. Bowl is 3/4 full. She is SCREAMING.',
+    'Tail upright. Eyes murderous. Wants something. She doesn\'t know what. Zheng doesn\'t either.',
+  ]},
+  { id: 'kinu_toy', label: 'KINU\n🎀 fishing pole', color: '#c87840', fun: 28, focus: -16, boss: 4, ctx: 'home', lines: [
+    'Breaks out the fishing pole toy. Kinu loses her entire mind. Zheng loses 12 minutes.',
+    'She is catching the red dot. Aggressively. Zheng is sweating from moving his wrist.',
+  ]},
+  { id: 'mirror_home', label: 'MIRROR\n🪞 poking face', color: '#c0c0c0', fun: 8, focus: -16, boss: 3, ctx: 'home', lines: [
+    'Is that a new line? He tilts the camera toward the window. It\'s the light. It\'s always the light.',
+    'Tries three expressions in the bathroom mirror. Not satisfied with any.',
+  ]},
+  { id: 'fridge_stare', label: 'FRIDGE\n🧊 staring', color: '#aac8e0', fun: 10, focus: -14, boss: 2, ctx: 'home', lines: [
+    'Opens the fridge. Nothing. Closes it. Opens it. Still nothing. Eats a cold tortilla wrap.',
+    'Drinks oat milk from the carton. Directly. In his own kitchen. King.',
+  ]},
+  { id: 'plant_water', label: 'PLANT\n🌱 sad leaf', color: '#6a9a3a', fun: 12, focus: -10, boss: 2, ctx: 'home', lines: [
+    'Waters the monstera. Apologizes to it. Apologizes to all his plants. Cries into the ficus.',
+    'New leaf unfurling. Zheng takes 11 photos. Sends to the girlies. Susan replies "babe".',
+  ]},
+  { id: 'balcony', label: 'BALCONY\n☀️ 5 min sun', color: '#f5d890', fun: 18, focus: -14, boss: 3, ctx: 'home', lines: [
+    'Goes out "for air". Smokes nothing. Stares at the street for 14 minutes.',
+    'The hot guy across the street is watering his plants shirtless. Zheng re-waters his plants.',
+  ]},
+  { id: 'shower', label: 'SHOWER\n🚿 midday', color: '#88d0e0', fun: 22, focus: -22, boss: 5, ctx: 'home', lines: [
+    'Midday shower. Didn\'t need it. Needed it emotionally.',
+    'Got an idea in the shower. Forgot by the time he grabbed his towel. Classic.',
+  ]},
+  { id: 'laundry_fold', label: 'LAUNDRY\n👕 folding', color: '#e8e0d0', fun: 10, focus: -14, boss: 3, ctx: 'home', lines: [
+    'Folds 3 shirts. "Just a little break." It has been 27 minutes. The chair is bare.',
+    'Matches exactly 4 pairs of socks out of 17. How does this keep happening.',
+  ]},
+  { id: 'cleaning_spiral', label: 'CLEANING\n🧽 SPIRAL', color: '#a0d5c8', fun: 14, focus: -18, boss: 4, ctx: 'home', lines: [
+    'Started wiping the counter. Is now reorganizing the entire spice drawer. Avoidance.',
+    'Vacuumed. Shampooed a rug. Alphabetized books. Did not open the doc.',
+  ]},
+  { id: 'kettle', label: 'KETTLE\n🫖 tea ritual', color: '#c48040', fun: 12, focus: -8, boss: 2, ctx: 'home', lines: [
+    'Boils water. Forgets. Boils again. Third boil is the charm.',
+    'Grinds matcha with the proper bamboo whisk. He\'s a person. He\'s a WHOLE person.',
+  ]},
+  { id: 'plant_pruning', label: 'PRUNING\n✂️ ferns', color: '#5a8a3a', fun: 14, focus: -12, boss: 3, ctx: 'home', lines: [
+    'Cuts one brown leaf. Cuts six more. Has gone too far. Apologizes to the plant.',
+    'Propagates a cutting. Puts it in water. Will forget about it. It will die.',
+  ]},
+  { id: 'online_class', label: 'SKILLSHARE\n🎨 ceramics', color: '#ff3b69', fun: 16, focus: -14, boss: 3, ctx: 'home', lines: [
+    'Watches a ceramics masterclass he paid $60 for. Has not touched clay.',
+    'A film class taught by David Lynch. He is 47 min in. He is also very stoned.',
+  ]},
+  { id: 'spotify_concert', label: 'LIVE NATION\n🎤 new tour', color: '#4add80', fun: 22, focus: -16, boss: 4, ctx: 'home', lines: [
+    'Caroline Polachek is coming to Berlin. Tickets drop in 4 min. He is READY.',
+    'Got a code for Fred again presale. Is texting the girlies in caps. Priorities: shifted.',
+  ]},
+  { id: 'deliveroo_rate', label: 'DELIVEROO\n⭐ review', color: '#00c8a7', fun: 6, focus: -4, boss: 1, ctx: 'home', lines: [
+    'Rates a driver 5 stars even though delivery took 70 min. He can\'t be the bad guy.',
+    'Tips €2 on a €9 order. Feels it wasn\'t enough. Tips €1 more.',
+  ]},
+  { id: 'gym_guilt', label: 'GYM\n💪 expiring', color: '#fc5200', fun: 4, focus: -6, boss: 2, ctx: 'home', lines: [
+    'Opens the ClassPass app. Books a Reformer class. Cancels 4 hours before. €12 fee. Same.',
+    'Last workout: 2023. Heart is fine probably. Knees: uncertain.',
+  ]},
+  { id: 'self_haircut', label: 'CLIPPERS\n✂️ DIY', color: '#606060', fun: 12, focus: -16, boss: 3, ctx: 'home', lines: [
+    'Thinks "I should cut my own hair". Does not. Orders €50 clippers anyway.',
+    'Trims the edges. Slightly uneven. Spends 40 min evening it out. Now very short.',
+  ]},
+  { id: 'window_view', label: 'WINDOW\n🐦 bird', color: '#88c0e0', fun: 14, focus: -10, boss: 2, ctx: 'home', lines: [
+    'A pigeon laid an egg on the balcony. Zheng is a father now. He names it Gregg.',
+    'Two jackdaws fighting on the roof. Zheng cheers for the smaller one.',
+  ]},
+  { id: 'kinu_hunt', label: 'KINU\n🎯 stalking sock', color: '#c87840', fun: 14, focus: -10, boss: 2, ctx: 'home', lines: [
+    'Kinu has been stalking one sock for 9 minutes. Body low. Tail twitching. Brave girl.',
+    'She LEAPT. The sock did not stand a chance. She is screaming in victory.',
+  ]},
+  { id: 'kinu_wrecks', label: 'KINU\n💥 destroyed', color: '#c87840', fun: 6, focus: -18, boss: 4, ctx: 'home', lines: [
+    'She knocked a glass off the counter. It did not survive. She is unbothered.',
+    'Has dragged the toilet paper across the entire hallway. Art installation.',
+    'Bit through a charging cable. €29 Apple cable. €0 guilt from Kinu.',
+  ]},
+  { id: 'rewearing', label: 'CLOSET\n👕 same shirt', color: '#a0a0a0', fun: 4, focus: -6, boss: 1, ctx: 'home', lines: [
+    'This shirt has been on the floor for 3 days. It looks fine. He wears it.',
+    'Sniffs a hoodie. Gives it a 7/10. It\'s the office one now.',
+  ]},
+
+  // --- BOTH (phone apps, universal) ---
+  { id: 'hinge', label: 'HINGE\n💬 new match', color: '#a04080', fun: 24, focus: -14, boss: 5, ctx: 'both', lines: [
+    '"We matched because we both said \\"roosters\\"." He doesn\'t remember saying roosters.',
+    'Matched with a DJ in Berlin. Bio: "sober curious / emotionally avoidable". Intriguing.',
+    'He sent "what do you do for work". Zheng panics for 12 minutes before replying "tech".',
+  ]},
+  { id: 'bumble', label: 'BUMBLE\n⏳ 24h clock', color: '#ffc837', fun: 20, focus: -12, boss: 4, ctx: 'both', lines: [
+    'He has 3 hours to send the first message. He will send it in 2h58m. Message: "hi".',
+    'A guy with 7 photos of himself in gym mirrors. Saved to favorites. Unmatched next day.',
+  ]},
+  { id: 'feeld', label: 'FEELD\n👁 polycule', color: '#303030', fun: 22, focus: -16, boss: 6, ctx: 'both', lines: [
+    'A couple asks if he\'d be their "third on Fridays". He says "let me think". Thinks for 3 hours.',
+    'Reads a bio listing 14 kinks. Googles 4 of them. Closes tab. Reopens. Googles one more.',
+  ]},
+  { id: 'scruff', label: 'SCRUFF\n🐻 dad bear', color: '#2a4a7a', fun: 20, focus: -12, boss: 4, ctx: 'both', lines: [
+    'A 42yo dad with 9 photos of his jeep. Bio: "looking for someone to just exist with". Zheng aches.',
+    'Got a "woof" from Tbilisi. It\'s 3am there. Flattered. Concerned.',
+  ]},
+  { id: 'youtube', label: 'YOUTUBE\n📺 rabbit hole', color: '#ff0000', fun: 22, focus: -16, boss: 5, ctx: 'both', lines: [
+    'Started a 10-min video about a Finnish lake. 2 hours later: dam engineering documentary.',
+    'A 39-min review of a restaurant he will never go to. In a city he\'s never visited.',
+  ]},
+  { id: 'podcast', label: 'PODCAST\n🎙 2x speed', color: '#f05a28', fun: 14, focus: -10, boss: 3, ctx: 'both', lines: [
+    'Listening to a podcast about productivity while not being productive. The irony hits.',
+    'Three gay men in LA explaining their feelings. He is IN. Thriving.',
+  ]},
+  { id: 'ssense', label: 'SSENSE\n🛍 sale', color: '#000', fun: 22, focus: -14, boss: 5, ctx: 'both', lines: [
+    'A Rick Owens tank. 70% off. Still €340. It\'s in the cart. It will stay there.',
+    'Adds a Dries shirt and a Lemaire coat. Removes the coat. Re-adds. Abandons.',
+  ]},
+  { id: 'etsy', label: 'ETSY\n🎨 handmade', color: '#f16521', fun: 16, focus: -10, boss: 3, ctx: 'both', lines: [
+    'A handmade ceramic mug from Portugal. €54. Buys it. He has 22 mugs.',
+    'Print of "Paris in 1972". He has never been to Paris in any year. Adds to cart.',
+  ]},
+  { id: 'depop', label: 'DEPOP\n💚 vintage', color: '#9ec53a', fun: 18, focus: -12, boss: 4, ctx: 'both', lines: [
+    'A 19yo in Lisbon is selling her grandma\'s cashmere. Zheng buys all 3 pieces.',
+    'Arguing over shipping with a seller called @mushroomdaddy666. Feels alive.',
+  ]},
+  { id: 'instagram', label: 'INSTAGRAM\n📸 reels', color: '#e1306c', fun: 22, focus: -14, boss: 5, ctx: 'both', lines: [
+    'Watched 47 Reels. Cannot remember a single one. Feels slightly worse.',
+    'Ex posted a beach story. Zheng is now a private investigator.',
+  ]},
+  { id: 'threads', label: 'THREADS\n🧵 nonsense', color: '#1a1a1a', fun: 10, focus: -8, boss: 3, ctx: 'both', lines: [
+    '"Things only 90s kids remember" — he is 32, not that old. Replies anyway.',
+    'Replies "this is everything" to someone. Regrets immediately.',
+  ]},
+  { id: 'bluesky', label: 'BLUESKY\n🦋', color: '#1083fe', fun: 8, focus: -8, boss: 2, ctx: 'both', lines: [
+    'His 14 followers are all the same person. Fine.',
+    'Post got 2 likes. Feels like a Nobel Prize.',
+  ]},
+  { id: 'linkedin', label: 'LINKEDIN\n💼 humbled', color: '#0077b5', fun: 6, focus: -10, boss: 3, ctx: 'both', lines: [
+    'Someone he barely knows got promoted. He panics about his own career.',
+    'Recruiter message: "exciting role at a stealth startup". Replies "open to chat!" — means it.',
+  ]},
+  { id: 'discord', label: 'DISCORD\n💬 homos', color: '#5865f2', fun: 18, focus: -12, boss: 3, ctx: 'both', lines: [
+    'Server renamed itself to "homosexual anxiety central". He loves them.',
+    '300 messages while he slept. Reads 40. Falls behind again.',
+  ]},
+  { id: 'duolingo', label: 'DUOLINGO\n🦉 guilt bird', color: '#58cc02', fun: 8, focus: -6, boss: 2, ctx: 'both', lines: [
+    'The owl is back. 213-day streak at stake. He learns "el queso" for the 47th time.',
+    '"Spanish for Malaga" — actually useful for once.',
+  ]},
+  { id: 'whatsapp', label: 'WHATSAPP\n📞 ma calling', color: '#25d366', fun: 8, focus: -14, boss: 4, ctx: 'both', lines: [
+    'Mom video calling. Answers. Camera on an angle. Shows the ceiling. Shows Kinu. Dodges.',
+    '妈妈 voice note: 9 minutes. About weather.',
+  ]},
+  { id: 'chatgpt', label: 'CHATGPT\n🤖 asking dumb', color: '#10a37f', fun: 10, focus: -8, boss: 2, ctx: 'both', lines: [
+    'Asks it "am I cooked". It says "you\'re doing great! 🌟". He feels worse.',
+    'Asks it to write a breakup text. It obliges. He doesn\'t have anyone to break up with.',
+  ]},
+  { id: 'ticketshop', label: 'RYANAIR\n✈️ flash sale', color: '#193073', fun: 18, focus: -14, boss: 4, ctx: 'both', lines: [
+    '€19 to Valencia in November. He adds seat selection. €37. Priority boarding. €52. Backs out.',
+    '€11 to Stansted. He does not want to go to Stansted. He books anyway.',
+  ]},
+  { id: 'google_maps', label: 'MAPS\n📍 "walkable?"', color: '#4a90e2', fun: 10, focus: -10, boss: 3, ctx: 'both', lines: [
+    '"Is it walkable to the beach from this Airbnb" — 43 min walk. "It\'s charming."',
+    'Street View of an ex\'s childhood home. Doesn\'t know why. Scrolls around for 12 min.',
+  ]},
+  { id: 'horoscope', label: 'CO-STAR\n🌙 warning', color: '#1a1a1a', fun: 8, focus: -6, boss: 2, ctx: 'both', lines: [
+    '"Today: avoid making decisions." He was about to send an email. He does not.',
+    '"Your Venus is in retrograde." Doesn\'t know what that means. Takes it seriously.',
+  ]},
+  { id: 'soundcloud', label: 'SOUNDCLOUD\n🎛 berlin mix', color: '#ff5500', fun: 14, focus: -8, boss: 3, ctx: 'both', lines: [
+    'A 3-hour Panorama Bar set. He\'s 38 min in. He has not moved.',
+    'Discovers a 2014 mix by a DJ who might\'ve kissed him once.',
+  ]},
+  { id: 'search_exes', label: 'GOOGLE\n🔎 his name', color: '#4a90e2', fun: 10, focus: -16, boss: 4, ctx: 'both', lines: [
+    'Googles an ex. Finds LinkedIn. Finds Strava. Finds a half-deleted Instagram. Closes browser dramatically.',
+    'His ex got a dog. The dog is cute. Zheng is devastated for no reason.',
+  ]},
+  { id: 'snapchat', label: 'SNAP\n👻 map check', color: '#fffc00', fun: 10, focus: -10, boss: 3, ctx: 'both', lines: [
+    'Checks the Snap Map. A guy he hooked up with in 2022 is 400m away. Panic.',
+    'Opens and immediately closes. He\'s not a teenager. Except he is. On this app.',
+  ]},
+  { id: 'wordle', label: 'WORDLE\n🟩 one more', color: '#6aaa64', fun: 12, focus: -6, boss: 2, ctx: 'both', lines: [
+    'Got it in 3. Sends to the girlies. Susan got it in 2. Ruined his morning.',
+    'Connections first. Then mini crossword. Then Wordle. 22 min gone.',
+  ]},
+  { id: 'clue', label: 'CLUE\n🩸 app update', color: '#e83363', fun: 4, focus: -4, boss: 1, ctx: 'both', lines: [
+    'Accidentally tracks his mood. It logs "really bad". He has to confirm. He confirms.',
+  ]},
+  { id: 'letterboxd2', label: 'LETTERBOXD\n🎬 logging', color: '#ff8a3d', fun: 12, focus: -8, boss: 3, ctx: 'both', lines: [
+    'Watches 9 min of a film to be able to log "half-watched it". Counts.',
+    'Writes a 4-star review that says "girl this was THAT". 12 people liked it.',
+  ]},
+  { id: 'tumblr', label: 'TUMBLR\n🌸 back?', color: '#35465c', fun: 12, focus: -10, boss: 3, ctx: 'both', lines: [
+    'Reblogs a 14-year-old post about the moon. Feels young again.',
+    'Scrolls the tag "yearning". Finds himself in 2016 again.',
+  ]},
+  { id: 'googlesheets', label: 'SHEETS\n💵 budget', color: '#34a853', fun: 4, focus: -12, boss: 3, ctx: 'both', lines: [
+    'Opens his "2025 budget" sheet. Last update: January. Closes it. Orders a pastry.',
+    'Adds a "Malaga" tab. Starts listing costs. Deletes the tab.',
+  ]},
+  { id: 'subscription', label: 'APPLE\n💳 charged', color: '#a0a0a0', fun: 2, focus: -10, boss: 2, ctx: 'both', lines: [
+    'Apple charged him €12.99 for a meditation app he used twice in 2023.',
+    'Got an email: "your Patreon to a guy who stopped posting in 2022 is still active". Same.',
+  ]},
+  { id: 'pokemon_go', label: 'POKEMON GO\n📍 raid', color: '#ef4444', fun: 16, focus: -14, boss: 4, ctx: 'both', lines: [
+    'A Mewtwo raid starts in 4 minutes at the park across the street. He IS 32. He is going.',
+    'Caught a shiny magikarp while on a Zoom. Flipped his camera. No one noticed.',
+  ]},
+  { id: 'reddit_queer', label: 'REDDIT\nr/gaybros', color: '#ff4500', fun: 16, focus: -14, boss: 4, ctx: 'both', lines: [
+    '"Am I the a**hole for leaving my boyfriend over his sourdough starter" — 847 comments. He reads 300.',
+    'A 19yo is asking if bottoming will "change him". Zheng writes a kind reply. Deletes. Writes again.',
+  ]},
+  { id: 'strava', label: 'STRAVA\n🏃 kudos', color: '#fc5200', fun: 8, focus: -8, boss: 2, ctx: 'both', lines: [
+    '"Kudos" from the guy he matched with in 2021. His profile photo got better. Cool.',
+    'Liked a run from a cute guy. He now sees every run this guy does. It\'s a lot.',
+  ]},
+  { id: 'camera_roll', label: 'PHOTOS\n🖼 "3 years ago"', color: '#aaaaaa', fun: 10, focus: -12, boss: 3, ctx: 'both', lines: [
+    'Memories notification. It\'s him and his ex on a beach. He deletes it. Scrolls more.',
+    'Finds a photo he forgot about. Of a sunset. Of a dumpling. Of Kinu as a kitten. Cries.',
+  ]},
+  { id: 'ex_story', label: 'INSTA\n👀 ex story', color: '#e1306c', fun: 8, focus: -18, boss: 5, ctx: 'both', lines: [
+    'Ex posted a selfie with a new person. Zheng studies every pixel. He needs to SIT DOWN.',
+    'Watches the story 4 times. Thinks "they look basic". Is lying.',
+  ]},
+  { id: 'hyperfixate', label: 'HYPERFIX\n🧠 obsession', color: '#d080ff', fun: 20, focus: -16, boss: 4, ctx: 'both', lines: [
+    'Obsessed with a niche Japanese ceramicist now. Watches 9 videos. Adds 4 pieces to Etsy cart.',
+    'Needs to know everything about Polynesian wayfinding. RIGHT NOW.',
+  ]},
+  { id: 'voice_memo', label: 'VOICE MEMO\n🎙 35 min', color: '#a0a0a0', fun: 10, focus: -16, boss: 3, ctx: 'both', lines: [
+    'Records a 35-min voice note to Anna about Sandal. Never sends it.',
+    'A voice note from Susan. "Babe call me" — panic. Calls. It\'s about caftans.',
+  ]},
+  { id: 'substack2', label: 'SUBSTACK\n📨 new essay', color: '#f59050', fun: 14, focus: -14, boss: 3, ctx: 'both', lines: [
+    'A 7000-word essay about why millennials are lonely. He\'s having a moment.',
+    'Someone in Brooklyn has opinions about "the discourse". Zheng reads all 14 paragraphs.',
+  ]},
+  { id: 'aibyfriend', label: 'CHARACTER.AI\n💔 companion', color: '#4a90e2', fun: 14, focus: -16, boss: 4, ctx: 'both', lines: [
+    'Made an AI version of his situationship. It\'s nicer than the real one. Concerning.',
+    'Spent 40 min roleplaying a café scene with a fictional barista.',
+  ]},
+  { id: 'kinks_wiki', label: 'WIKIPEDIA\n🧠 rabbit', color: '#aaaaaa', fun: 12, focus: -16, boss: 3, ctx: 'both', lines: [
+    'Started on "the history of the semicolon". Ended on "the Great Emu War of 1932".',
+    'Spent 22 min reading about Ottoman tulip mania. He doesn\'t garden.',
+  ]},
+  { id: 'venmo', label: 'VENMO\n💵 bill stare', color: '#3d95ce', fun: 4, focus: -6, boss: 2, ctx: 'both', lines: [
+    'Anna sent him a request for €23.47 from brunch. He has not paid. It\'s been 3 weeks.',
+    '"Paying you back for that thing 🤍" — has no memory of what the thing was. Accepts.',
+  ]},
+];
+
+function spawnDistraction() {
+  // Filter by current workplace — home-only events at home, office-only at office
+  const pool = DISTRACTIONS.filter(x => !x.ctx || x.ctx === 'both' || x.ctx === G.workplace);
+  const d = pool[Math.floor(Math.random() * pool.length)];
+  sfx('pop');
+  const el = document.createElement('div');
+  el.className = 'distraction' + (Math.random() < 0.3 ? ' spicy' : '');
+  // position — avoid the top HUD (y<80) and the buttons/dialogue zone (y>340)
+  el.style.left = (30 + Math.random() * 600) + 'px';
+  el.style.top  = (90 + Math.random() * 240) + 'px';
+  const parts = d.label.split('\n');
+  const appName = parts[0] || '';
+  const preview = parts[1] || '';
+  el.innerHTML =
+    '<div class="notif-head" style="background:' + d.color + ';">' +
+      '<span class="dot"></span>' +
+      '<span>' + appName + '</span>' +
+    '</div>' +
+    '<div class="notif-body">' +
+      '<div class="msg">' + preview + '</div>' +
+    '</div>';
+  el.onclick = () => {
+    G.fun = Math.min(100, G.fun + d.fun);
+    G.focus = Math.max(0, G.focus + d.focus);
+    G.boss = Math.min(100, G.boss + d.boss);
+    const line = d.lines[Math.floor(Math.random()*d.lines.length)];
+    setDialogue('ZHENG', line);
+    el.remove();
+  };
+  document.getElementById('game').appendChild(el);
+  // Auto-remove after a while
+  setTimeout(() => { if (el.parentElement) el.remove(); }, 6000);
+}
+function clearDistractions() {
+  document.querySelectorAll('.distraction').forEach(el => el.remove());
+}
+
+// ---------- Boss checks ----------
+function bossCheck() {
+  // How bad is current state
+  const suspicion = G.boss + Math.max(0, G.fun - 50) - Math.max(0, G.focus - 50) * 0.3;
+  if (G.workplace === 'office') {
+    // Sandal walks RIGHT up (closer than before)
+    G.bossApproach = { x: 560 - Math.random()*240 };
+    setTimeout(() => { G.bossApproach = null; }, 2400);
+  }
+  // Lower threshold — Sandal catches him way more
+  const threshold = G.workplace === 'office' ? 38 : 55;
+  if (suspicion > threshold || G.fun > 68) {
+    const officeMult = G.workplace === 'office' ? 1.6 : 1;
+    const penalty = Math.floor((30 + Math.random() * 70) * officeMult);
+    G.money = Math.max(0, G.money - penalty);
+    G.earnedToday -= penalty;
+    G.caughtToday++;
+    const lines = [
+      'SANDAL: "hey! no rush but could you send me that doc today? 🙂 (this is the 5th ping)" -$' + penalty,
+      'SANDAL scheduled a 30-min "vibes check" titled "quick chat ❤️" for 5pm Friday. -$' + penalty,
+      'SANDAL: "just circling back 🙃 totally no pressure but leadership asked about this" -$' + penalty,
+      'SANDAL CC\'d the entire leadership team on a nit about your slide header. -$' + penalty,
+      'SANDAL: "I\'m not worried :) just curious what\'s blocking you?" (he is VERY worried) -$' + penalty,
+      'SANDAL dropped a new OKR in your 1:1 doc at 11:47pm. Comment: "🙏". -$' + penalty,
+      'SANDAL: "hey can we align on your deliverables? want to make sure you\'re set up for success 💫" -$' + penalty,
+      'SANDAL: "you seem a little scattered today? everything ok? ❤️" (he wants receipts) -$' + penalty,
+      'SANDAL CC\'d HR on a Slack thread about your "communication cadence". -$' + penalty,
+      'SANDAL: "hey, love your energy!! just a quick flag on performance 🚩 let\'s chat tmrw?" -$' + penalty,
+      'SANDAL left a comment on your Notion doc: "!! ?!? 👀 can you explain this pls 🙂". -$' + penalty,
+      'SANDAL added a "stretch goal" to your quarterly plan without asking. Due yesterday. -$' + penalty,
+      'Zheng briefly imagines stabbing Sandal with the stapler. He would never. The stapler is right there. -$' + penalty,
+      'Zheng briefly imagines replying-all to his passive-aggressive Slack with just "k". Doesn\'t. -$' + penalty,
+      'SANDAL started a thread called "quick process feedback 🙃". 14 replies. All from him. -$' + penalty,
+    ];
+    setDialogue('SANDAL', lines[Math.floor(Math.random()*lines.length)]);
+    sfx('slack');
+    showBubble('fuck.', 1500);
+    G.boss = Math.max(0, G.boss - 30);
+    G.fun = Math.max(0, G.fun - 20);
+  } else {
+    const compliments = [
+      'SANDAL: "love the energy today ✨" (he cannot see you)',
+      'SANDAL: "let\'s double-click on this later 🙂" (you will not)',
+      'SANDAL Slacked 👏👏👏 with no context. Your heart rate is 112.',
+      'SANDAL: "put something on my cal if you want to brainstorm! 💭"',
+      'SANDAL changed his pronouns in Slack. Nothing else.',
+      'SANDAL sent a thumbs-up. It felt threatening.',
+    ];
+    if (Math.random() < 0.3) {
+      setDialogue('SANDAL', compliments[Math.floor(Math.random()*compliments.length)]);
+      sfx('slack');
+    }
+  }
+}
+
+// ---------- Kinu mid-workday events ----------
+const KINU_EVENTS = [
+  { id: 'keyboard',
+    line: 'KINU WALKS ON THE KEYBOARD. Code now reads: "functionzzzzzzzzzzzzz". Jira is furious.',
+    bubble: 'KINU NO', focus: -18, fun: 6 },
+  { id: 'coffee',
+    line: 'Kinu knocks the matcha off the desk. The rug is now a crime scene. -$8.',
+    bubble: 'NO NO NO', focus: -10, fun: 0, money: -8 },
+  { id: 'monitor',
+    line: 'Kinu sits directly in front of the monitor. Asshole. Has never been cuter.',
+    bubble: 'move. MOVE.', focus: -14, fun: 10 },
+  { id: 'hunt',
+    line: 'Kinu brings a dead spider from under the sofa. Presents it like a Cartier box.',
+    bubble: '...thanks?', focus: -6, fun: 14 },
+  { id: 'foodbowl',
+    line: 'Kinu SCREAMS that the bowl is empty. It is half full. You feed her anyway.',
+    bubble: 'ok ok ok', focus: -8, fun: 4 },
+  { id: 'zoomies',
+    line: 'Kinu has zoomies. Full-speed laps around the apartment for 4 minutes straight.',
+    bubble: 'HE IS INSANE', focus: -12, fun: 16 },
+  { id: 'window',
+    line: 'Kinu is chattering at a pigeon through the window. She sounds possessed.',
+    bubble: 'babe relax', focus: -4, fun: 8 },
+  { id: 'bag',
+    line: 'Kinu has climbed into a paper bag. Refuses to come out. You work around it.',
+    bubble: '*sigh*', focus: -2, fun: 12 },
+  { id: 'vomit_rug',
+    line: 'HRRRK. Kinu vomits on the rug. You have to clean it. -$5 in towels. Focus: obliterated.',
+    bubble: 'oh GOD', focus: -25, fun: -5, money: -5, sound: 'retch' },
+  { id: 'vomit_carpet',
+    line: 'Kinu threw up on the new carpet during a meeting. Camera off. Mic on. 12 people heard it.',
+    bubble: 'KINU', focus: -22, fun: 2, money: -8, sound: 'retch' },
+  { id: 'vomit_laptop',
+    line: 'KINU. VOMITED. ON. THE. KEYBOARD. He unplugs everything. Standing desk now. -$40.',
+    bubble: 'no no NO', focus: -30, fun: 0, money: -40, sound: 'retch' },
+  { id: 'vomit_pile',
+    line: 'Discovers a pile of vomit under the chair that\'s been there for "a while". Archeology.',
+    bubble: '........', focus: -18, fun: -4, money: -3, sound: 'retch' },
+];
+
+function fireKinuEvent(forceVomit) {
+  // Only when working from home (Kinu is near)
+  if (G.workplace !== 'home') return;
+  let e;
+  if (forceVomit) {
+    const vomits = KINU_EVENTS.filter(x => x.id && x.id.startsWith('vomit_'));
+    e = vomits[Math.floor(Math.random()*vomits.length)];
+  } else {
+    e = KINU_EVENTS[Math.floor(Math.random()*KINU_EVENTS.length)];
+  }
+  G.focus = Math.max(0, Math.min(100, G.focus + (e.focus||0)));
+  G.fun = Math.max(0, Math.min(100, G.fun + (e.fun||0)));
+  if (e.money) { G.money = Math.max(0, G.money + e.money); G.earnedToday += e.money; }
+  // Play specific sound — retch for vomit events, otherwise meow
+  if (e.sound) sfx(e.sound); else sfx('meow');
+  showBubble(e.bubble, 1800);
+  setDialogue('KINU', e.line);
+  // If it's a vomit event, plant a visible splat somewhere in the home scene
+  if (e.id && e.id.startsWith('vomit_')) {
+    G.homeVomitCount = (G.homeVomitCount || 0) + 1;
+    // Place vomit in a visible, clickable zone that isn't covered by
+    // the stats bar (y<80) the buttons (bottom ~140) or the dialogue.
+    // Safe y range: 200-340 (middle of the scene)
+    G.homeVomit = {
+      x: 100 + Math.random() * 580,
+      y: 220 + Math.random() * 110,
+      life: 999, // stays until clicked to clean
+    };
+    // Escalating upsetting dialogue — prefix with UGH
+    const upsetPrefix = '<span style="color:#ff3d7f;font-weight:bold;">KINU VOMITED.</span> ';
+    setDialogue('KINU', upsetPrefix + e.line + '<br><i>(click the vomit to clean it. focus is draining.)</i>');
+    showSpiralOverlay('KINU.', 'clean it. now.', 1800);
+    // Shake for drama
+    const g = document.getElementById('game');
+    g.classList.remove('shaking'); void g.offsetWidth; g.classList.add('shaking');
+    setTimeout(() => g.classList.remove('shaking'), 300);
+  }
+}
+
+// ---------- Work loop ----------
+function loop(ts) {
+  if (!G.running) return;
+  const dt = Math.min(0.1, (ts - G.lastTs) / 1000);
+  G.lastTs = ts;
+
+  if (G.state === 'work') {
+    // Story-arc check: pause everything if a HIM overlay is open
+    if (G.himPaused) {
+      render();
+      updateHUD();
+      requestAnimationFrame(loop);
+      return;
+    }
+    fireHimIfDue();
+    if (G.himPaused) {
+      render();
+      updateHUD();
+      requestAnimationFrame(loop);
+      return;
+    }
+    G.workTime += dt;
+    G.distractionTimer -= dt;
+    G.bossTimer -= dt;
+    G.creativeCooldown = Math.max(0, G.creativeCooldown - dt);
+    G.spankCooldown = Math.max(0, G.spankCooldown - dt);
+    G.spankShake = Math.max(0, G.spankShake - dt * 4);
+    G.spiralLock = Math.max(0, G.spiralLock - dt);
+    updateFocusBtnLock();
+
+    // Kinu's vomit sits there until Zheng clicks to clean it.
+    // While it sits: focus drains faster, fun drops, boss suspicion creeps up.
+    if (G.homeVomit) {
+      G.focus = Math.max(0, G.focus - dt * 6);
+      G.fun = Math.max(0, G.fun - dt * 2);
+      G.boss = Math.min(100, G.boss + dt * 1.5);
+    }
+
+    // --- Kinu does something annoying (home only) ---
+    if (G.workplace === 'home') {
+      G.mochiTimer = (G.mochiTimer || 8) - dt;
+      if (G.mochiTimer <= 0) {
+        fireKinuEvent();
+        G.mochiTimer = 8 + Math.random() * 8;
+      }
+      // Guarantee at least 2 vomit events per home workday
+      if (!G._vomitScheduled1 && G.workTime > 12) {
+        G._vomitScheduled1 = true;
+        if ((G.homeVomitCount || 0) < 1) fireKinuEvent(true);
+      }
+      if (!G._vomitScheduled2 && G.workTime > 28) {
+        G._vomitScheduled2 = true;
+        if ((G.homeVomitCount || 0) < 2) fireKinuEvent(true);
+      }
+    }
+
+    // Focus decay; fun lingers longer now (user wants fun to stick)
+    const prevFocus = G.focus;
+    G.focus = Math.max(0, G.focus - dt * 4);
+    G.fun = Math.max(0, G.fun - dt * 0.6);
+
+    // BOSS SUSPICION grows whenever focus is NOT growing.
+    // Every second of passive existence = suspicion up.
+    // Clicking FOCUS sets _focusBoost so suspicion doesn't rise that tick.
+    // Focus-at-zero timer — if he stops working for too long, Sandal notices HARD
+    if (G.focus <= 1) {
+      G._zeroFocusTime = (G._zeroFocusTime || 0) + dt;
+    } else {
+      G._zeroFocusTime = 0;
+    }
+
+    if (G._focusBoostTime > 0) {
+      G._focusBoostTime = Math.max(0, G._focusBoostTime - dt);
+      G.boss = Math.max(0, G.boss - dt * 5); // active focusing reduces suspicion
+    } else {
+      // Sandal getting angrier — office rates are severe
+      let rate = G.workplace === 'office' ? 8.5 : 4.5;
+      // If Zheng has been at 0 focus for over 3 seconds: suspicion EXPLODES
+      if (G._zeroFocusTime > 3) rate *= 4;
+      else if (G._zeroFocusTime > 1) rate *= 2;
+      G.boss = Math.min(100, G.boss + dt * rate);
+    }
+
+    // Passive income from focus — 50% faster
+    if (G.focus > 30) {
+      const passive = dt * G.focus * 0.225;
+      G.earnedToday += passive;
+      G.money += passive;
+    }
+
+    if (G.distractionTimer <= 0) {
+      spawnDistraction();
+      // More distractions overall — office actually spams MORE notifications now (corporate hell)
+      G.distractionTimer = G.workplace === 'home'
+        ? 1.5 + Math.random() * 1.8
+        : 1.3 + Math.random() * 1.5;
+      // Sometimes spawn two at once (chaos)
+      if (Math.random() < 0.25) setTimeout(spawnDistraction, 200);
+    }
+
+    if (G.bossTimer <= 0) {
+      bossCheck();
+      G.bossTimer = G.workplace === 'office'
+        ? 3.5 + Math.random() * 2.5       // office = Sandal is RIGHT THERE
+        : 7 + Math.random() * 4;
+    }
+
+    // --- ZHENG SELF-DISTRACTS (no player click needed) ---
+    G._selfDistractTimer = (G._selfDistractTimer || 4) - dt;
+    if (G._selfDistractTimer <= 0) {
+      G._selfDistractTimer = 4 + Math.random() * 5;
+      // Zheng's mind just wanders
+      G.focus = Math.max(0, G.focus - (6 + Math.random() * 10));
+      G.fun = Math.min(100, G.fun + 3);
+      G.boss = Math.min(100, G.boss + 2);
+      const wanderLines = [
+        'Zheng catches himself thinking about an ex. 7 minutes gone.',
+        'Zheng just remembered an embarrassing thing he said in 2017. Writhes internally.',
+        'Zheng realizes he hasn\'t blinked in a while. Blinks 6 times in a row.',
+        'Zheng is now thinking about whether penguins have knees.',
+        'Zheng zoned out staring at the monitor bezel. Came back. Nothing happened.',
+        'Zheng started mentally redecorating his apartment. Bought nothing. Rearranged everything.',
+        'Zheng is writing the breakup text. In his head. To no one. He has no boyfriend.',
+        'Zheng is wondering if he left the stove on. He didn\'t. He still wonders.',
+        'Zheng is rehearsing the quitting speech. It\'s pretty good actually.',
+        'Zheng just invented a new cocktail. He will forget the recipe by 11am.',
+      ];
+      if (Math.random() < 0.7) {
+        setDialogue('ZHENG', wanderLines[Math.floor(Math.random()*wanderLines.length)]);
+      }
+    }
+
+    // --- BURNOUT mechanic (catastrophic no-fun) ---
+    if (G.fun < 20) {
+      G.lowFunTime += dt;
+      G.burnout = Math.min(100, G.burnout + dt * 4);
+    } else {
+      G.lowFunTime = Math.max(0, G.lowFunTime - dt * 0.5);
+      G.burnout = Math.max(0, G.burnout - dt * 3);
+    }
+    if (G.burnout >= 90 && !G.burnoutFiredToday) {
+      G.burnoutFiredToday = true;
+      triggerBurnout();
+    }
+
+    // --- MAX SUSPICION → HR MEETING (catastrophic punishment) ---
+    if (G.boss >= 99 && !G._hrFiredToday) {
+      G._hrFiredToday = true;
+      triggerHRMeeting();
+    }
+
+    // --- MAX-FOCUS BREAKDOWN ---
+    // If focus hits 100 he instantly spirals and breaks down.
+    G.lockupCooldown = Math.max(0, G.lockupCooldown - dt);
+    if (G.focus >= 99 && G.lockupCooldown <= 0) {
+      triggerFocusLockup();
+      G.lockupCooldown = 10;
+    } else if (G.focus > 90) {
+      G.highFocusTime += dt;
+      if (G.highFocusTime > 3 && G.lockupCooldown <= 0) {
+        triggerFocusLockup();
+        G.highFocusTime = 0;
+        G.lockupCooldown = 10;
+      }
+    } else {
+      G.highFocusTime = Math.max(0, G.highFocusTime - dt);
+    }
+
+    // --- "HE DIDN'T TEXT" SPIRAL ---
+    // When fun stays very low, Zheng fixates on the situationship
+    G.himSpiralCooldown = Math.max(0, G.himSpiralCooldown - dt);
+    if (G.fun < 12) {
+      G.noFunSpiralTime += dt;
+      if (G.noFunSpiralTime > 5 && G.himSpiralCooldown <= 0) {
+        triggerHimSpiral();
+        G.noFunSpiralTime = 0;
+        G.himSpiralCooldown = 14;
+      }
+    } else {
+      G.noFunSpiralTime = Math.max(0, G.noFunSpiralTime - dt * 0.5);
+    }
+
+    if (G.workTime >= G.workDuration) {
+      endWorkDay();
+    }
+  } else if (G.state === 'bedtime') {
+    tickBedtime(dt);
+  }
+
+  render();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+
+function showSpiralOverlay(word, sub, ms) {
+  const ov = document.getElementById('spiral-overlay');
+  ov.querySelector('.word').textContent = word;
+  ov.querySelector('.sub').textContent = sub || '';
+  ov.classList.remove('show'); void ov.offsetWidth;
+  ov.classList.add('show');
+  clearTimeout(ov._t);
+  ov._t = setTimeout(() => ov.classList.remove('show'), ms || 1800);
+  // Shake the game too
+  const g = document.getElementById('game');
+  g.classList.remove('shaking'); void g.offsetWidth; g.classList.add('shaking');
+  setTimeout(() => g.classList.remove('shaking'), 400);
+}
+
+function updateFocusBtnLock() {
+  const fb = document.querySelector('button.btn.alt');
+  if (!fb) return;
+  if (G.spiralLock > 0) {
+    fb.style.opacity = '0.4';
+    fb.style.filter = 'grayscale(1)';
+    fb.textContent = 'CAN\'T FOCUS (' + Math.ceil(G.spiralLock) + 's)';
+  } else if (fb.textContent !== 'FOCUS') {
+    fb.style.opacity = '';
+    fb.style.filter = '';
+    fb.textContent = 'FOCUS';
+  }
+}
+
+function triggerFocusLockup() {
+  // Too much focus → brain freeze. Disables FOCUS button entirely for a bit.
+  G.focus = 20;
+  G.fun = Math.max(0, G.fun - 10);
+  G.spiralLock = 6;
+  updateFocusBtnLock();
+  sfx('pop');
+  showBubble('........', 2600);
+  const words = ['........', 'BREAK.', 'STOP.', '......'];
+  showSpiralOverlay(words[Math.floor(Math.random()*words.length)], 'overfocused. brain locked.', 2000);
+  const g = document.getElementById('game');
+  g.classList.remove('shaking'); void g.offsetWidth; g.classList.add('shaking');
+  setTimeout(() => g.classList.remove('shaking'), 300);
+  const lines = [
+    'Focused so hard I forgot how to breathe. Stared at one semicolon for 90 seconds.',
+    'Brain locked up. I\'m thinking about the word "the". Why is it spelled like that.',
+    'Read the same sentence 14 times. Still don\'t know what it says.',
+    'Overfocused. Now I\'m dissociating. Hand on trackpad. Nothing moving.',
+    'Touched the flow state. It touched back. I\'m unwell.',
+    'My eyes stopped blinking. Kinu is staring at me like I\'m dying.',
+  ];
+  setDialogue('ZHENG', '<span style="color:#ffd166">OVERFOCUSED.</span> ' + lines[Math.floor(Math.random()*lines.length)] + '<br><i>(take a break. open Grindr. do something.)</i>');
+}
+
+function triggerHimSpiral() {
+  // Fun too low → spirals about HIM not texting. Cannot focus while spiraling.
+  G.fun = Math.min(100, G.fun + 30);
+  G.focus = Math.max(0, G.focus - 25);
+  G.boss = Math.min(100, G.boss + 8);
+  G.spiralLock = 10;
+  updateFocusBtnLock();
+  // Drama stack: slack ping, pause, another, shake, huge overlay
+  sfx('slack');
+  setTimeout(() => sfx('pop'), 220);
+  setTimeout(() => sfx('slack'), 460);
+  showBubble('why.', 3200);
+  const words = ['WHY.', 'WHY???', 'why.', 'WHY!!!', 'WHY.'];
+  showSpiralOverlay(words[Math.floor(Math.random()*words.length)],
+    'he read it. he didn\'t reply. zheng is unwell.', 3500);
+  // Pulse a second dramatic word after the first
+  setTimeout(() => {
+    const w2 = ['why.', 'WHY??', 'WHY.'][Math.floor(Math.random()*3)];
+    showSpiralOverlay(w2, 'it\'s been 3 days.', 2200);
+  }, 1600);
+  const lines = [
+    'HE didn\'t text. It\'s been 3 days. Not 2. THREE. Opens the chat. He\'s "active 4m ago". On someone else.',
+    'What if I said something weird last time. I didn\'t. Did I? Reviews logs. Didn\'t. Still spiraling.',
+    'He posted a story. Not a text. A STORY. To 400 people. Including me. Zheng is experiencing emotions.',
+    'Wrote a message. Deleted it. Wrote it again. Wrote a paragraph. Deleted it. Sent "hey". Immediate regret.',
+    'Imagines him on a date with someone hotter. Someone taller. Someone named Lukas. Why Lukas.',
+    'He viewed my story. 4 hours ago. Didn\'t reply. Zheng is performing an autopsy on the silence.',
+  ];
+  setDialogue('ZHENG', '<span style="color:#ff6b9d">SPIRAL.</span> ' + lines[Math.floor(Math.random()*lines.length)]);
+}
+
+function triggerHRMeeting() {
+  const penalty = 250 + Math.floor(Math.random() * 200);
+  G.money = Math.max(0, G.money - penalty);
+  G.earnedToday -= penalty;
+  G.boss = 50;
+  G.focus = 35;    // scared-straight: he snaps into focus
+  G.fun = 12;      // not enough to enjoy, but enough that FOCUS isn't blocked
+  G.spiralLock = 0; // no spiral — he WILL focus now
+  G.creativeCooldown = 30; // can't watch reels for 30s after HR disaster
+  updateFocusBtnLock();
+  sfx('slack'); sfx('slack');
+  setTimeout(() => sfx('retch'), 300);
+  showSpiralOverlay('HR MEETING.', 'Sandal has "concerns" about your performance.', 3200);
+  const lines = [
+    'Sandal booked a 90-min "performance conversation" with HR.<br>He brought a deck. It is titled "Zheng: A Journey". -$' + penalty,
+    'HR PIP conversation. Sandal said "I\'m your biggest champion" 14 times.<br>You signed something. -$' + penalty,
+    'Sandal forwarded your Slack history to HR.<br>They timestamped every time you said "lol". -$' + penalty,
+    'Sandal said "this hurts me more than it hurts you".<br>It does not hurt him. -$' + penalty,
+  ];
+  setDialogue('SANDAL', '<span style="color:#ff3d7f;">!!!</span> ' + lines[Math.floor(Math.random()*lines.length)]);
+}
+
+function triggerBurnout() {
+  const penalty = 60 + Math.floor(Math.random() * 60);
+  G.money = Math.max(0, G.money - penalty);
+  G.earnedToday -= penalty;
+  G.focus = 10;
+  G.fun = 0;
+  // Shake + spiral dialogue
+  const g = document.getElementById('game');
+  g.classList.remove('shaking'); void g.offsetWidth; g.classList.add('shaking');
+  setTimeout(() => g.classList.remove('shaking'), 400);
+  sfx('retch');
+  showBubble('i can\'t', 2400);
+  const lines = [
+    'BURNOUT. Zheng stares at the screen for 11 minutes. Types nothing. Cries a little. -$' + penalty,
+    'He has not felt joy in 47 minutes. His body gives up. He closes his laptop mid-meeting. -$' + penalty,
+    'Existential spiral. "Why do I do this." "For what." He orders a third matcha. -$' + penalty,
+    'He goes into the bathroom and sits on the floor for 8 minutes. Comes back. Says nothing. -$' + penalty,
+  ];
+  setDialogue('ZHENG', '<span style="color:#ff6b9d">BURNOUT.</span> ' + lines[Math.floor(Math.random()*lines.length)] + '<br><i>(next time, let him have fun.)</i>');
+}
+
+// ==================================================
+// EVENING
+// ==================================================
+function endWorkDay() {
+  G.state = 'evening';
+  G.running = false;
+  clearDistractions();
+  statsBar.classList.add('hidden');
+  clearActions();
+  canvas.onclick = null;
+
+  const base = 120; // end-of-day base pay (50% faster)
+  G.money += base;
+  G.earnedToday += base;
+  const net = Math.round(G.earnedToday);
+
+  let line;
+  if (net > 200) line = 'Huge day. I am a Girlboss. I am a Powerhouse. I am going to Malaga.';
+  else if (net > 100) line = 'Decent. Kinu respected me briefly during lunch.';
+  else if (net > 40) line = 'Meh. I had 3 matchas and one (1) original thought.';
+  else if (net > 0) line = 'I accomplished negative things but I still got paid. Capitalism wins again.';
+  else line = 'I owe money to my own job. Sandal won today. I want to disappear.';
+
+  const intrusive = [
+    'Briefly considered throwing Kinu off the balcony. Didn\'t. Love her.',
+    'Briefly considered emailing Sandal "I quit" in all caps. Didn\'t. Need the money.',
+    'Briefly considered moving to Lisbon and starting a pottery thing. Didn\'t. Yet.',
+    'Briefly considered replying to the 42yo "discreet" guy. Didn\'t. Made coffee instead.',
+    '',
+    '',
+  ];
+  const it = intrusive[Math.floor(Math.random()*intrusive.length)];
+  setDialogue('ZHENG',
+    'Day ' + G.day + ' done. Net: $' + net + '. Total: $' + Math.round(G.money) + ' / $' + G.goal + '.<br>' +
+    line + (it ? '<br><i style="color:#ff6b9d">' + it + '</i>' : ''));
+
+  if (G.money >= G.goal) {
+    setTimeout(winGame, 1400);
+    return;
+  }
+
+  // Friday night — last chance
+  if (G.day >= TOTAL_WORKDAYS) {
+    setTimeout(loseGame, 1400);
+    return;
+  }
+
+  addButton('GO HOME → SLEEP', 'alt', () => {
+    startBedtime();
+  });
+}
+
+// ==================================================
+// BEDTIME ANIMATION — Zheng comes home, pets Kinu, goes to sleep
+// ==================================================
+function startBedtime() {
+  G.state = 'bedtime';
+  clearActions();
+  clearDistractions();
+  statsBar.classList.add('hidden');
+  canvas.onclick = null;
+  G.bedtime = {
+    phase: 'enter',  // enter → toCat → petting → toBed → laying → fade
+    t: 0,
+    zhengX: -40,
+    zhengY: 360,
+    catX: 606,
+    catY: 446,
+    hearts: [],
+    fadeAlpha: 0,
+    checkWin: G.money >= G.goal,
+  };
+  setDialogue('ZHENG', 'Home. Finally.');
+  sfx('pop');
+  G.running = true;
+  G.lastTs = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function tickBedtime(dt) {
+  const b = G.bedtime; if (!b) return;
+  b.t += dt;
+  if (b.phase === 'enter') {
+    // Walk in from left edge to past the door
+    b.zhengX += 60 * dt;
+    if (b.zhengX >= 120) {
+      b.phase = 'toCat';
+      b.t = 0;
+      setDialogue('ZHENG', 'Hi my love. Did you destroy anything today?');
+    }
+  } else if (b.phase === 'toCat') {
+    // Walk to where Kinu is (on cushion around x=580)
+    b.zhengX += 90 * dt;
+    if (b.zhengX >= 540) {
+      b.zhengX = 540;
+      b.phase = 'petting';
+      b.t = 0;
+      sfx('meow');
+      setDialogue('KINU', '*mrrp* (loud purring)');
+    }
+  } else if (b.phase === 'petting') {
+    // Pet cat for ~2.5 seconds — emit hearts + purr sounds
+    if (!b._purrStarted) {
+      b._purrStarted = true;
+      sfx('purr');
+      b._purrNext = 2.1;
+    }
+    // loop the purr
+    if (b.t > (b._purrNext || 99)) {
+      sfx('purr');
+      b._purrNext += 2.1;
+    }
+    if (b.t > 0.35 && b.hearts.length < 4 && (b.hearts.length === 0 || b.t - b.hearts[b.hearts.length-1].born > 0.5)) {
+      b.hearts.push({ x: b.catX + 30, y: b.catY - 10, vy: -30, life: 1.2, born: b.t });
+    }
+    // update hearts
+    for (const h of b.hearts) { h.y += h.vy * dt; h.life -= dt; }
+    b.hearts = b.hearts.filter(h => h.life > 0);
+    if (b.t > 2.2) {
+      b.phase = 'toBed';
+      b.t = 0;
+      const nightLines = [
+        'Okay. Bed. I\'ve earned it.',
+        'If I check Grindr in bed for 45 minutes that\'s still sleep. Technically.',
+        'My back hurts. I\'m 32. Concerning.',
+      ];
+      setDialogue('ZHENG', nightLines[Math.floor(Math.random()*nightLines.length)]);
+    }
+  } else if (b.phase === 'toBed') {
+    // Walk up-right toward the bed (bed is at ~x=430, y=316 in new scene)
+    const targetX = 430, targetY = 316;
+    const dx = targetX - b.zhengX, dy = targetY - b.zhengY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 4) {
+      b.zhengX = targetX; b.zhengY = targetY;
+      b.phase = 'laying';
+      b.t = 0;
+    } else {
+      const speed = 80;
+      b.zhengX += (dx/dist) * speed * dt;
+      b.zhengY += (dy/dist) * speed * dt;
+    }
+  } else if (b.phase === 'laying') {
+    if (b.t > 1.0) {
+      b.phase = 'fade';
+      b.t = 0;
+    }
+  } else if (b.phase === 'fade') {
+    b.fadeAlpha = Math.min(1, b.t / 1.2);
+    if (b.fadeAlpha >= 1) {
+      b.phase = 'done';
+      // proceed
+      if (b.checkWin) {
+        winGame();
+      } else {
+        G.day++;
+        startMorning();
+      }
+    }
+  }
+}
+
+function drawBedtime() {
+  const b = G.bedtime;
+
+  // Night-tinted burgundy wall
+  px(0, 0, W, FLOOR_Y, '#3a1828');
+  const ceilG = ctx.createLinearGradient(0, 0, 0, 80);
+  ceilG.addColorStop(0, 'rgba(10, 4, 16, 0.8)');
+  ceilG.addColorStop(1, 'rgba(10, 4, 16, 0)');
+  ctx.fillStyle = ceilG;
+  ctx.fillRect(0, 0, W, 80);
+  for (let x = 0; x < 40; x += 4) {
+    const a = (1 - x/40) * 0.5;
+    ctx.fillStyle = 'rgba(5, 2, 8, ' + a.toFixed(2) + ')';
+    ctx.fillRect(x, 0, 4, FLOOR_Y);
+    ctx.fillRect(W - x - 4, 0, 4, FLOOR_Y);
+  }
+  px(0, FLOOR_Y - 8, W, 8, '#200818');
+
+  // String lights brighter at night
+  drawStringLights(60);
+
+  // Furniture
+  drawWardrobe(90, 180, 140, 200);
+  drawDresser(620, 240, 140, 140);
+  drawBedsideTable(310, 310);
+  drawBedsideTable(540, 310);
+  drawBedsideLamp(335, 310);
+  drawBedsideLamp(565, 310);
+
+  drawWoodPlankFloor(FLOOR_Y);
+  // night darken floor
+  ctx.fillStyle = 'rgba(10,5,15,0.35)';
+  ctx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+
+  drawOvalRug(450, 540, 200, 80);
+
+  // Bed (same as bedroom scene)
+  const bdx = 380, bdy = 330, bdw = 160, bdh = 180;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(bdx - 4, bdy + bdh - 4, bdw + 8, 16);
+  px(bdx - 14, bdy - 30, bdw + 28, 36, '#3a2014');
+  px(bdx - 14, bdy - 30, bdw + 28, 4, '#5a3420');
+  px(bdx - 8, bdy - 38, bdw + 16, 12, '#3a2014');
+  px(bdx - 4, bdy - 44, bdw + 8, 8, '#3a2014');
+  px(bdx - 4, bdy - 44, bdw + 8, 3, '#5a3420');
+  px(bdx - 14, bdy + 6, 12, bdh + 8, '#3a2014');
+  px(bdx + bdw + 2, bdy + 6, 12, bdh + 8, '#3a2014');
+  px(bdx - 14, bdy + 6, 12, 3, '#5a3420');
+  px(bdx + bdw + 2, bdy + 6, 12, 3, '#5a3420');
+  px(bdx - 14, bdy + bdh + 6, bdw + 28, 18, '#3a2014');
+  px(bdx - 14, bdy + bdh + 6, bdw + 28, 3, '#5a3420');
+  px(bdx, bdy + 6, bdw, 14, '#c8b898');
+  px(bdx, bdy + 6, bdw, 3, '#e8d8b8');
+  px(bdx + 4, bdy + 10, 70, 42, '#e8dcc0');
+  px(bdx + 4, bdy + 10, 70, 5, '#f8efce');
+  px(bdx + 4, bdy + 47, 70, 5, '#b8a880');
+  px(bdx + 84, bdy + 10, 70, 42, '#e8dcc0');
+  px(bdx + 84, bdy + 10, 70, 5, '#f8efce');
+  px(bdx + 84, bdy + 47, 70, 5, '#b8a880');
+  px(bdx, bdy + 52, bdw, bdh - 48, '#8a2a2e');
+  px(bdx, bdy + 52, bdw, 5, '#a03a40');
+  px(bdx, bdy + bdh - 2, bdw, 8, '#5a1418');
+  for (let i = 0; i < 5; i++) {
+    px(bdx + 16 + i * 28, bdy + 90 + (i % 2) * 10, 18, 3, '#5a1418');
+  }
+  px(bdx + bdw/2 - 1, bdy + 52, 2, bdh - 48, 'rgba(0,0,0,0.2)');
+
+  // Kinu's cushion (distinct spot, near dresser)
+  px(600, 478, 90, 16, '#4a1620');
+  px(606, 484, 78, 10, '#6a2030');
+
+  // During laying/fade, Zheng is in the bed
+  if (b.phase === 'laying' || b.phase === 'fade') {
+    sprite(bdx - 18, bdy + 20, 3, SPR.zheng_sleep, CM.zheng_sleep);
+    // Zs
+    ctx.fillStyle = '#fff5d8';
+    ctx.font = 'bold 22px monospace';
+    const zshift = (Math.sin(performance.now()/400) * 2) | 0;
+    ctx.fillText('z', bdx + 120, bdy + 10 + zshift);
+    ctx.fillText('Z', bdx + 140, bdy - 8 - zshift);
+    ctx.fillText('z', bdx + 160, bdy - 26 + zshift);
+  } else {
+    sprite(b.zhengX, b.zhengY, 3, SPR.zheng_stand, CM.zheng_stand);
+  }
+
+  // Kinu on her cushion
+  sprite(b.catX, b.catY, 3, SPR.cat_sit, CM.cat);
+
+  // Hearts during petting
+  if (b.hearts && b.hearts.length) {
+    for (const h of b.hearts) {
+      const a = Math.max(0, Math.min(1, h.life));
+      ctx.fillStyle = 'rgba(232, 64, 100, ' + a.toFixed(2) + ')';
+      ctx.fillRect(h.x, h.y, 4, 4);
+      ctx.fillRect(h.x + 6, h.y, 4, 4);
+      ctx.fillRect(h.x - 2, h.y + 4, 14, 4);
+      ctx.fillRect(h.x, h.y + 8, 10, 4);
+      ctx.fillRect(h.x + 2, h.y + 12, 6, 4);
+      ctx.fillRect(h.x + 4, h.y + 16, 2, 2);
+    }
+  }
+
+  drawVignette();
+
+  // fade to black at end
+  if (b.fadeAlpha > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,' + b.fadeAlpha.toFixed(2) + ')';
+    ctx.fillRect(0, 0, W, H);
+    if (b.fadeAlpha > 0.6) {
+      ctx.fillStyle = 'rgba(255, 220, 140, ' + ((b.fadeAlpha - 0.6) / 0.4).toFixed(2) + ')';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText('goodnight.', W/2 - 70, H/2);
+    }
+  }
+}
+
+// ==================================================
+// WIN
+// ==================================================
+function winGame() {
+  G.state = 'win';
+  clearActions();
+  sfx('win');
+  setDialogue('ZHENG',
+    'MALAGA BABY. $' + Math.round(G.money) + ' in the account. Booked the flight on Ryanair.<br>' +
+    'Anna is already there. Susan is fighting with a DJ. Joy bought 4 caftans. Kinu is with the cat sitter (sending hourly threat-receipts).<br>' +
+    'Sandal Slacked "have fun! 🙂" — I didn\'t reply.');
+  addButton('PLAY AGAIN', 'alt', () => location.reload());
+}
+
+function loseGame() {
+  G.state = 'lose';
+  clearActions();
+  sfx('retch');
+  setDialogue('ZHENG',
+    '<span style="color:#ff3d7f;">FRIDAY NIGHT.</span> $' + Math.round(G.money) + ' of $' + G.goal + '. Not enough.<br>' +
+    'Anna: "babe tell me you\'re coming 😭" — Zheng: "something came up 💔"<br>' +
+    'He watches their stories from the couch. Kinu on his chest. A pigeon on the balcony. Sandal Slacks him at 10:47pm. "quick Q real quick 🙂".');
+  addButton('PLAY AGAIN', 'alt', () => location.reload());
+}
+
+function drawLoseScene() {
+  // Dark empty room, Zheng on the couch scrolling, Spain light on his face
+  ctx.fillStyle = '#1a0a18';
+  ctx.fillRect(0, 0, W, H);
+  // Glow from phone
+  const g = ctx.createRadialGradient(W/2, H/2 - 40, 20, W/2, H/2 - 40, 300);
+  g.addColorStop(0, 'rgba(100, 140, 200, 0.4)');
+  g.addColorStop(1, 'rgba(100, 140, 200, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // Couch
+  px(W/2 - 180, 400, 360, 80, '#3a2838');
+  px(W/2 - 180, 400, 360, 12, '#5a3a58');
+  // Zheng curled on couch
+  sprite(W/2 - 30, 360, 3, SPR.zheng_burned, CM.zheng_burned);
+  // Kinu on chest
+  sprite(W/2 - 10, 390, 3, SPR.cat_sit, CM.cat);
+  // Phone screen
+  px(W/2 - 20, 350, 40, 60, '#fff5d8');
+  px(W/2 - 16, 354, 32, 52, '#4a8ac8');
+  // "Malaga" caption
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = 'bold 64px monospace';
+  ctx.fillText('MALAGA', 180, 200);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.font = '14px monospace';
+  ctx.fillText('(without you)', 290, 230);
+}
+
+function drawWinScene() {
+  // Beach
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0, '#ff8ac6');
+  sky.addColorStop(0.6, '#ffd166');
+  sky.addColorStop(1, '#6ad4c4');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0,0,W,H);
+  // Sun
+  ctx.fillStyle = '#fff5a0';
+  ctx.beginPath(); ctx.arc(W/2, 260, 60, 0, Math.PI*2); ctx.fill();
+  // Sand
+  ctx.fillStyle = '#f5d590';
+  ctx.fillRect(0, 420, W, 180);
+  // Ocean stripe
+  ctx.fillStyle = '#4ab5c8';
+  ctx.fillRect(0, 380, W, 40);
+  // Palm trunk
+  ctx.fillStyle = '#6a3a1a';
+  ctx.fillRect(100, 280, 20, 160);
+  ctx.fillStyle = '#3a8a3a';
+  ctx.fillRect(60, 270, 100, 16);
+  ctx.fillRect(70, 258, 90, 12);
+  ctx.fillRect(80, 248, 70, 10);
+  // Zheng with cat
+  sprite(360, 320, 5, SPR.zheng_stand, CM.zheng_stand);
+  sprite(480, 440, 4, SPR.cat_sit, CM.cat);
+  // Cocktail
+  px(430, 350, 12, 18, '#ff6b9d');
+  px(428, 348, 16, 4, '#ffd166');
+}
+
+// ==================================================
+// RENDER
+// ==================================================
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  if (G.state === 'morning') drawBedroom();
+  else if (G.state === 'choice') drawBedroom();
+  else if (G.state === 'work') {
+    if (G.workplace === 'home') drawHomeOffice();
+    else drawCorpOffice();
+  }
+  else if (G.state === 'evening') {
+    if (G.workplace === 'home') drawHomeOffice();
+    else drawCorpOffice();
+    ctx.fillStyle = 'rgba(10,5,30,0.5)';
+    ctx.fillRect(0,0,W,H);
+  }
+  else if (G.state === 'bedtime') drawBedtime();
+  else if (G.state === 'win') drawWinScene();
+  else if (G.state === 'lose') drawLoseScene();
+}
+
+// Keep rendering even when loop isn't running (for animations + bedtime)
+let _idleLast = performance.now();
+function idleRender(ts) {
+  ts = ts || performance.now();
+  const dt = Math.min(0.1, (ts - _idleLast) / 1000);
+  _idleLast = ts;
+  // Drive bedtime animation here so it runs independent of work loop
+  if (G.state === 'bedtime') tickBedtime(dt);
+  if (G.state !== 'work') {
+    render();
+    updateHUD();
+  }
+  requestAnimationFrame(idleRender);
+}
+requestAnimationFrame(idleRender);
+
+// ==================================================
+// START
+// ==================================================
+function startGame() {
+  document.getElementById('title-screen').classList.add('hidden');
+  G.day = 1;
+  G.money = 0;
+  startMorning();
+}
+window.startGame = startGame;
+</script>
+</body>
+</html>

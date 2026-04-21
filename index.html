@@ -702,6 +702,7 @@ const G = {
   brokeUpWithHim: false,
   _himFiredToday: 0,
   himPaused: false,
+  himAfterLock: 0,   // 5s spiral after each HIM message — all action buttons blocked, distractions still work
   running: false,
 };
 
@@ -1139,8 +1140,13 @@ function showHimNode(pathKey) {
         G.focus = Math.max(0, Math.min(100, G.focus + (opt.focus || 0)));
         G.boss = Math.max(0, Math.min(100, G.boss + (opt.boss || 0)));
         G.himPaused = false;
+        // Post-message spiral: zheng is reeling. All action buttons locked for 5s.
+        // Distractions still fire and are clickable.
+        G.himAfterLock = 5;
+        G.spiralLock = 5; // also blocks FOCUS via existing path
         setDialogue('ZHENG', opt.react);
         updateFocusBtnLock();
+        updateActionBtnLock();
         // Advance the path
         G.himPath = (G.himPath || '') + String(idx);
         // If we reached an ending node, apply the ending
@@ -2708,11 +2714,15 @@ function startWork(where) {
   });
   focusBtn.title = 'Actually do work. Earn $, drop suspicion, lose a bit of fun.';
   const creativeBtn = addButton('THIRSTY REELS', 'warn', () => {
+    if ((G.himAfterLock || 0) > 0) {
+      setDialogue('ZHENG', 'i can\'t think straight right now. give me a second. (' + Math.ceil(G.himAfterLock) + 's)');
+      return;
+    }
     if (G.creativeCooldown > 0) {
       setDialogue('ZHENG', 'My phone is charging. Cooldown: ' + Math.ceil(G.creativeCooldown) + 's.');
       return;
     }
-    G.creativeCooldown = 5;
+    G.creativeCooldown = 3;
     G.fun = Math.min(100, G.fun + 35);
     G.focus = Math.max(0, G.focus - 8);
     G.boss = Math.min(100, G.boss + 22);
@@ -2733,14 +2743,22 @@ function startWork(where) {
   });
   creativeBtn.title = 'Watch thirsty reels. Fun up. Focus down. Boss notices.';
   addButton('SPANK HIM', 'spank', () => {
+    if ((G.himAfterLock || 0) > 0) {
+      setDialogue('ZHENG', 'not now. not NOW. (' + Math.ceil(G.himAfterLock) + 's)');
+      return;
+    }
     if (G.spankCooldown > 0) {
       setDialogue('ZHENG', '...ow. Easy. Cooldown: ' + Math.ceil(G.spankCooldown) + 's.');
       return;
     }
-    G.spankCooldown = 4;
+    G.spankCooldown = 2;
     doSpank();
   });
   addButton('TAKE A BREAK', '', () => {
+    if ((G.himAfterLock || 0) > 0) {
+      setDialogue('ZHENG', 'already on a break. it\'s called dissociating. (' + Math.ceil(G.himAfterLock) + 's)');
+      return;
+    }
     G.fun = Math.max(0, G.fun - 12);
     G.focus = Math.min(100, G.focus + 18);
     G.boss = Math.max(0, G.boss - 5);
@@ -3599,7 +3617,9 @@ function loop(ts) {
     G.spankCooldown = Math.max(0, G.spankCooldown - dt);
     G.spankShake = Math.max(0, G.spankShake - dt * 4);
     G.spiralLock = Math.max(0, G.spiralLock - dt);
+    G.himAfterLock = Math.max(0, (G.himAfterLock || 0) - dt);
     updateFocusBtnLock();
+    updateActionBtnLock();
 
     // Kinu's vomit sits there until Zheng clicks to clean it.
     // While it sits: focus drains faster, fun drops, boss suspicion creeps up.
@@ -3732,13 +3752,13 @@ function loop(ts) {
     G.lockupCooldown = Math.max(0, G.lockupCooldown - dt);
     if (G.focus >= 99 && G.lockupCooldown <= 0) {
       triggerFocusLockup();
-      G.lockupCooldown = 10;
+      G.lockupCooldown = 6;
     } else if (G.focus > 90) {
       G.highFocusTime += dt;
       if (G.highFocusTime > 3 && G.lockupCooldown <= 0) {
         triggerFocusLockup();
         G.highFocusTime = 0;
-        G.lockupCooldown = 10;
+        G.lockupCooldown = 6;
       }
     } else {
       G.highFocusTime = Math.max(0, G.highFocusTime - dt);
@@ -3752,7 +3772,7 @@ function loop(ts) {
       if (G.noFunSpiralTime > 5 && G.himSpiralCooldown <= 0) {
         triggerHimSpiral();
         G.noFunSpiralTime = 0;
-        G.himSpiralCooldown = 14;
+        G.himSpiralCooldown = 8;
       }
     } else {
       G.noFunSpiralTime = Math.max(0, G.noFunSpiralTime - dt * 0.5);
@@ -3784,6 +3804,22 @@ function showSpiralOverlay(word, sub, ms) {
   setTimeout(() => g.classList.remove('shaking'), 400);
 }
 
+function updateActionBtnLock() {
+  const btns = document.querySelectorAll('#actions button.btn');
+  const locked = (G.himAfterLock || 0) > 0;
+  btns.forEach(b => {
+    if (locked) {
+      b.style.opacity = '0.4';
+      b.style.filter = 'grayscale(1)';
+      b.dataset.locked = '1';
+    } else if (b.dataset.locked === '1') {
+      b.style.opacity = '';
+      b.style.filter = '';
+      b.dataset.locked = '';
+    }
+  });
+}
+
 function updateFocusBtnLock() {
   const fb = document.querySelector('button.btn.alt');
   if (!fb) return;
@@ -3802,7 +3838,7 @@ function triggerFocusLockup() {
   // Too much focus → brain freeze. Disables FOCUS button entirely for a bit.
   G.focus = 20;
   G.fun = Math.max(0, G.fun - 10);
-  G.spiralLock = 6;
+  G.spiralLock = 4;
   updateFocusBtnLock();
   sfx('pop');
   showBubble('........', 2600);
@@ -3827,7 +3863,7 @@ function triggerHimSpiral() {
   G.fun = Math.min(100, G.fun + 30);
   G.focus = Math.max(0, G.focus - 25);
   G.boss = Math.min(100, G.boss + 8);
-  G.spiralLock = 10;
+  G.spiralLock = 6;
   updateFocusBtnLock();
   // Drama stack: slack ping, pause, another, shake, huge overlay
   sfx('slack');
@@ -3861,7 +3897,7 @@ function triggerHRMeeting() {
   G.focus = 35;    // scared-straight: he snaps into focus
   G.fun = 12;      // not enough to enjoy, but enough that FOCUS isn't blocked
   G.spiralLock = 0; // no spiral — he WILL focus now
-  G.creativeCooldown = 30; // can't watch reels for 30s after HR disaster
+  G.creativeCooldown = 10; // can't watch reels for 10s after HR disaster
   updateFocusBtnLock();
   sfx('slack'); sfx('slack');
   setTimeout(() => sfx('retch'), 300);

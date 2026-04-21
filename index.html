@@ -4281,17 +4281,9 @@ function endWorkDay() {
     'Day ' + G.day + ' done. Net: $' + net + '. Total: $' + Math.round(G.money) + ' / $' + G.goal + '.<br>' +
     line + (it ? '<br><i style="color:#ff6b9d">' + it + '</i>' : ''));
 
-  if (G.money >= G.goal) {
-    setTimeout(winGame, 1400);
-    return;
-  }
-
-  // Friday night — last chance
-  if (G.day >= TOTAL_WORKDAYS) {
-    setTimeout(loseGame, 1400);
-    return;
-  }
-
+  // No early win/lose — the HIM storyline needs all 5 days to resolve.
+  // Even if Zheng already has $3000 on Tuesday, he still lives the week.
+  // Final evaluation happens in the bedtime fade at the end of Day 5.
   addButton('GO HOME → SLEEP', 'alt', () => {
     fireEveningHim();
   });
@@ -4315,7 +4307,9 @@ function startBedtime() {
     catY: 446,
     hearts: [],
     fadeAlpha: 0,
-    checkWin: G.money >= G.goal,
+    // Win/lose is only evaluated at the end of Friday night (Day 5).
+    // On Day 5, we decide based on whether the goal was met across the week.
+    isFinalNight: G.day >= TOTAL_WORKDAYS,
   };
   setDialogue('ZHENG', 'Home. Finally.');
   sfx('pop');
@@ -4396,9 +4390,10 @@ function tickBedtime(dt) {
     b.fadeAlpha = Math.min(1, b.t / 1.2);
     if (b.fadeAlpha >= 1) {
       b.phase = 'done';
-      // proceed
-      if (b.checkWin) {
-        winGame();
+      // Friday night: the week is over. Evaluate goal + end.
+      if (b.isFinalNight) {
+        if (G.money >= G.goal) winGame();
+        else loseGame();
       } else {
         G.day++;
         startMorning();
